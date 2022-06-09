@@ -92,7 +92,18 @@ export const defaultOptions = {
   directSourceFile: null,
   // When enabled, parenthesized expressions are represented by
   // (non-standard) ParenthesizedExpression nodes
-  preserveParens: false
+  preserveParens: false,
+  // Turn on objj to allow Objective-J syntax
+  objj: false,
+  // Turn on preprocess to allow C preprocess derectives.
+  // #define macro1
+  // #define macro2 console.log("Hello")
+  // #define macro3(x,y,z) if (x > y && y > z) console.log("Touchdown!!!")
+  // #if macro1
+  // #else
+  // #endif
+  // etc...
+  preprocess: false,
 }
 
 // Interpret and default an options object

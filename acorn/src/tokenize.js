@@ -312,15 +312,36 @@ pp.readToken_question = function() { // '?'
 pp.readToken_numberSign = function() { // '#'
   const ecmaVersion = this.options.ecmaVersion
   let code = 35 // '#'
+  let numberSignPos = this.pos++
+  let wordStart = this.pos
+  let wordStartCode = this.fullCharCodeAtPos()
+  let errorPos = numberSignPos
+  let word = this.readWord1()
+  if (this.options.preprocess) {
+    // Check if it is the first token on the line
+    lineBreak.lastIndex = 0
+    let match = lineBreak.exec(this.input.slice(this.lastTokEnd, numberSignPos))
+    if (this.lastTokEnd === 0 || this.lastTokEnd === numberSignPos || match) {
+      switch (word) {
+        case "pragma":
+          this.preprocesSkipRestOfLine()
+          return this.next()
+        
+        default:
+          break
+      }
+    }
+  }
   if (ecmaVersion >= 13) {
-    ++this.pos
-    code = this.fullCharCodeAtPos()
-    if (isIdentifierStart(code, true) || code === 92 /* '\' */) {
-      return this.finishToken(tt.privateId, this.readWord1())
+    errorPos = wordStart
+    code = wordStartCode
+    //code = this.fullCharCodeAtPos()
+    if (isIdentifierStart(wordStartCode, true) || wordStartCode === 92 /* '\' */) {
+      return this.finishToken(tt.privateId, word)
     }
   }
 
-  this.raise(this.pos, "Unexpected character '" + codePointToString(code) + "'")
+  this.raise(errorPos, "Unexpected character '" + codePointToString(code) + "'")
 }
 
 pp.getTokenFromCode = function(code) {
