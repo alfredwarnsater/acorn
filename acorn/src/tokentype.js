@@ -58,6 +58,7 @@ export const types = {
   name: new TokenType("name", startsExpr),
   privateId: new TokenType("privateId", startsExpr),
   eof: new TokenType("eof"),
+  eol: new TokenType("eol"),
 
   // Punctuation token types.
   bracketL: new TokenType("[", {beforeExpr: true, startsExpr: true}),
@@ -148,4 +149,26 @@ export const types = {
   _typeof: kw("typeof", {beforeExpr: true, prefix: true, startsExpr: true}),
   _void: kw("void", {beforeExpr: true, prefix: true, startsExpr: true}),
   _delete: kw("delete", {beforeExpr: true, prefix: true, startsExpr: true})
+}
+
+export const preTypes = {
+  // Preprocessor token types.
+  _preDefine: kw("define"),
+  _preUndef: kw("undef"),
+  _preIfdef: kw("ifdef"),
+  _preIfndef: kw("ifndef"),
+  _preIf: kw("if"),
+  _preElse: kw("else"),
+  _preEndif: kw("endif"),
+  _preElseIf: kw("elif"),
+  _preElseIfTrue: kw("elif (True)"),
+  _preElseIfFalse: kw("elif (false)"),
+  _prePragma: kw("pragma"),
+  _preDefined: kw("defined"),
+  _preBackslash: kw("\\"),
+  _preError: kw("error"),
+  _preWarning: kw("warning"),
+  _preprocessParamItem: kw("preprocessParamItem", {type: "preprocessParamItem"}), // FIXME: type is not used anymore
+  _preprocessSkipLine: kw("skipLine", {type: "skipLine"}), // FIXME: type is not used anymore
+  _preInclude: kw("include")
 }

@@ -35,7 +35,7 @@ export const keywordRelationalOperator = /^in(stanceof)?$/
 
 // ## Character categories
 
-const nonASCIIidentifierStart = new RegExp("[" + nonASCIIidentifierStartChars + "]")
+export const nonASCIIidentifierStart = new RegExp("[" + nonASCIIidentifierStartChars + "]")
 const nonASCIIidentifier = new RegExp("[" + nonASCIIidentifierStartChars + nonASCIIidentifierChars + "]")
 
 // This has a complexity linear to the value of the code. The

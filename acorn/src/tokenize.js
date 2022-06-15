@@ -126,18 +126,21 @@ pp.skipLineComment = function(startSkip) {
 // Called at the start of the parse and after every token. Skips
 // whitespace and comments, and.
 
-pp.skipSpace = function() {
+pp.skipSpace = function(dontSkipEOL) {
+  let ch
   loop: while (this.pos < this.input.length) {
-    let ch = this.input.charCodeAt(this.pos)
+    ch = this.input.charCodeAt(this.pos)
     switch (ch) {
     case 32: case 160: // ' '
       ++this.pos
       break
     case 13:
+      if (dontSkipEOL) break loop
       if (this.input.charCodeAt(this.pos + 1) === 10) {
         ++this.pos
       }
     case 10: case 8232: case 8233:
+      if (dontSkipEOL) break loop
       ++this.pos
       if (this.options.locations) {
         ++this.curLine
@@ -164,6 +167,7 @@ pp.skipSpace = function() {
       }
     }
   }
+  return ch
 }
 
 // Called at the end of every token. Sets `end`, `val`, and
@@ -190,27 +194,27 @@ pp.finishToken = function(type, val) {
 //
 // All in the name of speed.
 //
-pp.readToken_dot = function() {
+pp.readToken_dot = function(finisher) {
   let next = this.input.charCodeAt(this.pos + 1)
-  if (next >= 48 && next <= 57) return this.readNumber(true)
+  if (next >= 48 && next <= 57) return this.readNumber(true, pp.finishToken)
   let next2 = this.input.charCodeAt(this.pos + 2)
   if (this.options.ecmaVersion >= 6 && next === 46 && next2 === 46) { // 46 = dot '.'
     this.pos += 3
-    return this.finishToken(tt.ellipsis)
+    return finisher.call(this, tt.ellipsis)
   } else {
     ++this.pos
-    return this.finishToken(tt.dot)
+    return finisher.call(this, tt.dot)
   }
 }
 
-pp.readToken_slash = function() { // '/'
+pp.readToken_slash = function(finisher) { // '/'
   let next = this.input.charCodeAt(this.pos + 1)
   if (this.exprAllowed) { ++this.pos; return this.readRegexp() }
-  if (next === 61) return this.finishOp(tt.assign, 2)
-  return this.finishOp(tt.slash, 1)
+  if (next === 61) return this.finishOp(tt.assign, 2, finisher)
+  return this.finishOp(tt.slash, 1, finisher)
 }
 
-pp.readToken_mult_modulo_exp = function(code) { // '%*'
+pp.readToken_mult_modulo_exp = function(code, finisher) { // '%*'
   let next = this.input.charCodeAt(this.pos + 1)
   let size = 1
   let tokentype = code === 42 ? tt.star : tt.modulo
@@ -222,30 +226,30 @@ pp.readToken_mult_modulo_exp = function(code) { // '%*'
     next = this.input.charCodeAt(this.pos + 2)
   }
 
-  if (next === 61) return this.finishOp(tt.assign, size + 1)
-  return this.finishOp(tokentype, size)
+  if (next === 61) return this.finishOp(tt.assign, size + 1, finisher)
+  return this.finishOp(tokentype, size, finisher)
 }
 
-pp.readToken_pipe_amp = function(code) { // '|&'
+pp.readToken_pipe_amp = function(code, finisher) { // '|&'
   let next = this.input.charCodeAt(this.pos + 1)
   if (next === code) {
     if (this.options.ecmaVersion >= 12) {
       let next2 = this.input.charCodeAt(this.pos + 2)
-      if (next2 === 61) return this.finishOp(tt.assign, 3)
+      if (next2 === 61) return this.finishOp(tt.assign, 3, finisher)
     }
-    return this.finishOp(code === 124 ? tt.logicalOR : tt.logicalAND, 2)
+    return this.finishOp(code === 124 ? tt.logicalOR : tt.logicalAND, 2, finisher)
   }
-  if (next === 61) return this.finishOp(tt.assign, 2)
-  return this.finishOp(code === 124 ? tt.bitwiseOR : tt.bitwiseAND, 1)
+  if (next === 61) return this.finishOp(tt.assign, 2, finisher)
+  return this.finishOp(code === 124 ? tt.bitwiseOR : tt.bitwiseAND, 1, finisher)
 }
 
-pp.readToken_caret = function() { // '^'
+pp.readToken_caret = function(finisher) { // '^'
   let next = this.input.charCodeAt(this.pos + 1)
-  if (next === 61) return this.finishOp(tt.assign, 2)
-  return this.finishOp(tt.bitwiseXOR, 1)
+  if (next === 61) return this.finishOp(tt.assign, 2, finisher)
+  return this.finishOp(tt.bitwiseXOR, 1, finisher)
 }
 
-pp.readToken_plus_min = function(code) { // '+-'
+pp.readToken_plus_min = function(code, finisher) { // '+-'
   let next = this.input.charCodeAt(this.pos + 1)
   if (next === code) {
     if (next === 45 && !this.inModule && this.input.charCodeAt(this.pos + 2) === 62 &&
@@ -255,19 +259,19 @@ pp.readToken_plus_min = function(code) { // '+-'
       this.skipSpace()
       return this.nextToken()
     }
-    return this.finishOp(tt.incDec, 2)
+    return this.finishOp(tt.incDec, 2, finisher)
   }
-  if (next === 61) return this.finishOp(tt.assign, 2)
-  return this.finishOp(tt.plusMin, 1)
+  if (next === 61) return this.finishOp(tt.assign, 2, finisher)
+  return this.finishOp(tt.plusMin, 1, finisher)
 }
 
-pp.readToken_lt_gt = function(code) { // '<>'
+pp.readToken_lt_gt = function(code, finisher) { // '<>'
   let next = this.input.charCodeAt(this.pos + 1)
   let size = 1
   if (next === code) {
     size = code === 62 && this.input.charCodeAt(this.pos + 2) === 62 ? 3 : 2
-    if (this.input.charCodeAt(this.pos + size) === 61) return this.finishOp(tt.assign, size + 1)
-    return this.finishOp(tt.bitShift, size)
+    if (this.input.charCodeAt(this.pos + size) === 61) return this.finishOp(tt.assign, size + 1, finisher)
+    return this.finishOp(tt.bitShift, size, finisher)
   }
   if (next === 33 && code === 60 && !this.inModule && this.input.charCodeAt(this.pos + 2) === 45 &&
       this.input.charCodeAt(this.pos + 3) === 45) {
@@ -277,17 +281,17 @@ pp.readToken_lt_gt = function(code) { // '<>'
     return this.nextToken()
   }
   if (next === 61) size = 2
-  return this.finishOp(tt.relational, size)
+  return this.finishOp(tt.relational, size, finisher)
 }
 
-pp.readToken_eq_excl = function(code) { // '=!'
+pp.readToken_eq_excl = function(code, finisher) { // '=!'
   let next = this.input.charCodeAt(this.pos + 1)
-  if (next === 61) return this.finishOp(tt.equality, this.input.charCodeAt(this.pos + 2) === 61 ? 3 : 2)
+  if (next === 61) return this.finishOp(tt.equality, this.input.charCodeAt(this.pos + 2) === 61 ? 3 : 2, finisher)
   if (code === 61 && next === 62 && this.options.ecmaVersion >= 6) { // '=>'
     this.pos += 2
-    return this.finishToken(tt.arrow)
+    return finisher.call(this, tt.arrow)
   }
-  return this.finishOp(code === 61 ? tt.eq : tt.prefix, 1)
+  return this.finishOp(code === 61 ? tt.eq : tt.prefix, 1, finisher)
 }
 
 pp.readToken_question = function() { // '?'
@@ -323,19 +327,26 @@ pp.readToken_numberSign = function() { // '#'
     let match = lineBreak.exec(this.input.slice(this.lastTokEnd, numberSignPos))
     if (this.lastTokEnd === 0 || this.lastTokEnd === numberSignPos || match) {
       switch (word) {
-        case "pragma":
-          this.preprocesSkipRestOfLine()
-          return this.next()
-        
-        default:
-          break
+      case "pragma":
+        this.preprocesSkipRestOfLine()
+        break
+
+      case "define":
+        debugger
+        this.preprocessParseDefine()
+        break
+
+      default:
+        break
       }
+      this.preprocessFinishToken(this.preType, null, null, true)
+      return this.nextToken()
     }
   }
   if (ecmaVersion >= 13) {
     errorPos = wordStart
     code = wordStartCode
-    //code = this.fullCharCodeAtPos()
+    // code = this.fullCharCodeAtPos()
     if (isIdentifierStart(wordStartCode, true) || wordStartCode === 92 /* '\' */) {
       return this.finishToken(tt.privateId, word)
     }
@@ -344,88 +355,96 @@ pp.readToken_numberSign = function() { // '#'
   this.raise(errorPos, "Unexpected character '" + codePointToString(code) + "'")
 }
 
-pp.getTokenFromCode = function(code) {
+pp.getTokenFromCode = function(code, finisher = this.finishToken, allowEndOfLineToken) {
   switch (code) {
   // The interpretation of a dot depends on whether it is followed
   // by a digit or another two dots.
   case 46: // '.'
-    return this.readToken_dot()
+    return this.readToken_dot(finisher)
 
   // Punctuation tokens.
-  case 40: ++this.pos; return this.finishToken(tt.parenL)
-  case 41: ++this.pos; return this.finishToken(tt.parenR)
-  case 59: ++this.pos; return this.finishToken(tt.semi)
-  case 44: ++this.pos; return this.finishToken(tt.comma)
-  case 91: ++this.pos; return this.finishToken(tt.bracketL)
-  case 93: ++this.pos; return this.finishToken(tt.bracketR)
-  case 123: ++this.pos; return this.finishToken(tt.braceL)
-  case 125: ++this.pos; return this.finishToken(tt.braceR)
-  case 58: ++this.pos; return this.finishToken(tt.colon)
+  case 40: ++this.pos; return finisher.call(this, tt.parenL)
+  case 41: ++this.pos; return finisher.call(this, tt.parenR)
+  case 59: ++this.pos; return finisher.call(this, tt.semi)
+  case 44: ++this.pos; return finisher.call(this, tt.comma)
+  case 91: ++this.pos; return finisher.call(this, tt.bracketL)
+  case 93: ++this.pos; return finisher.call(this, tt.bracketR)
+  case 123: ++this.pos; return finisher.call(this, tt.braceL)
+  case 125: ++this.pos; return finisher.call(this, tt.braceR)
+  case 58: ++this.pos; return finisher.call(this, tt.colon)
 
   case 96: // '`'
     if (this.options.ecmaVersion < 6) break
     ++this.pos
-    return this.finishToken(tt.backQuote)
+    return finisher.call(this, tt.backQuote)
 
   case 48: // '0'
     let next = this.input.charCodeAt(this.pos + 1)
-    if (next === 120 || next === 88) return this.readRadixNumber(16) // '0x', '0X' - hex number
+    if (next === 120 || next === 88) return this.readRadixNumber(16, finisher) // '0x', '0X' - hex number
     if (this.options.ecmaVersion >= 6) {
-      if (next === 111 || next === 79) return this.readRadixNumber(8) // '0o', '0O' - octal number
-      if (next === 98 || next === 66) return this.readRadixNumber(2) // '0b', '0B' - binary number
+      if (next === 111 || next === 79) return this.readRadixNumber(8, finisher) // '0o', '0O' - octal number
+      if (next === 98 || next === 66) return this.readRadixNumber(2, finisher) // '0b', '0B' - binary number
     }
 
   // Anything else beginning with a digit is an integer, octal
   // number, or float.
   case 49: case 50: case 51: case 52: case 53: case 54: case 55: case 56: case 57: // 1-9
-    return this.readNumber(false)
+    return this.readNumber(false, finisher)
 
   // Quotes produce strings.
   case 34: case 39: // '"', "'"
-    return this.readString(code)
+    return this.readString(code, finisher)
 
   // Operators are parsed inline in tiny state machines. '=' (61) is
   // often referred to. `finishOp` simply skips the amount of
   // characters it is given as second argument, and returns a token
   // of the type given by its first argument.
   case 47: // '/'
-    return this.readToken_slash()
+    return this.readToken_slash(finisher)
 
   case 37: case 42: // '%*'
-    return this.readToken_mult_modulo_exp(code)
+    return this.readToken_mult_modulo_exp(code, finisher)
 
   case 124: case 38: // '|&'
-    return this.readToken_pipe_amp(code)
+    return this.readToken_pipe_amp(code, finisher)
 
   case 94: // '^'
-    return this.readToken_caret()
+    return this.readToken_caret(finisher)
 
   case 43: case 45: // '+-'
-    return this.readToken_plus_min(code)
+    return this.readToken_plus_min(code, finisher)
 
   case 60: case 62: // '<>'
-    return this.readToken_lt_gt(code)
+    return this.readToken_lt_gt(code, finisher)
 
   case 61: case 33: // '=!'
-    return this.readToken_eq_excl(code)
+    return this.readToken_eq_excl(code, finisher)
 
   case 63: // '?'
     return this.readToken_question()
 
   case 126: // '~'
-    return this.finishOp(tt.prefix, 1)
+    return this.finishOp(tt.prefix, 1, finisher)
 
   case 35: // '#'
     return this.readToken_numberSign()
   }
-
+  if (allowEndOfLineToken) {
+    if (code === 13 || code === 10 || code === 8232 || code === 8233) {
+      let size = (code === 13 && this.input.charCodeAt(this.pos + 1) === 10) ? 2 : 1
+      if (this.options.locations) {
+        this.lineStart = this.pos + size; ++this.curLine
+      }
+      return this.finishOp(tt.eol, size, finisher)
+    }
+  }
   this.raise(this.pos, "Unexpected character '" + codePointToString(code) + "'")
 }
 
-pp.finishOp = function(type, size) {
+pp.finishOp = function(type, size, finisher = pp.finishToken) {
   let str = this.input.slice(this.pos, this.pos + size)
   this.pos += size
-  return this.finishToken(type, str)
+  return finisher.call(this, type, str)
 }
 
 pp.readRegexp = function() {
@@ -524,7 +543,7 @@ function stringToBigInt(str) {
   return BigInt(str.replace(/_/g, ""))
 }
 
-pp.readRadixNumber = function(radix) {
+pp.readRadixNumber = function(radix, finisher) {
   let start = this.pos
   this.pos += 2 // 0x
   let val = this.readInt(radix)
@@ -533,12 +552,12 @@ pp.readRadixNumber = function(radix) {
     val = stringToBigInt(this.input.slice(start, this.pos))
     ++this.pos
   } else if (isIdentifierStart(this.fullCharCodeAtPos())) this.raise(this.pos, "Identifier directly after number")
-  return this.finishToken(tt.num, val)
+  return finisher.call(this, tt.num, val)
 }
 
 // Read an integer, octal integer, or floating-point number.
 
-pp.readNumber = function(startsWithDot) {
+pp.readNumber = function(startsWithDot, finisher) {
   let start = this.pos
   if (!startsWithDot && this.readInt(10, undefined, true) === null) this.raise(start, "Invalid number")
   let octal = this.pos - start >= 2 && this.input.charCodeAt(start) === 48
@@ -548,7 +567,7 @@ pp.readNumber = function(startsWithDot) {
     let val = stringToBigInt(this.input.slice(start, this.pos))
     ++this.pos
     if (isIdentifierStart(this.fullCharCodeAtPos())) this.raise(this.pos, "Identifier directly after number")
-    return this.finishToken(tt.num, val)
+    return finisher.call(this, tt.num, val)
   }
   if (octal && /[89]/.test(this.input.slice(start, this.pos))) octal = false
   if (next === 46 && !octal) { // '.'
@@ -564,7 +583,7 @@ pp.readNumber = function(startsWithDot) {
   if (isIdentifierStart(this.fullCharCodeAtPos())) this.raise(this.pos, "Identifier directly after number")
 
   let val = stringToNumber(this.input.slice(start, this.pos), octal)
-  return this.finishToken(tt.num, val)
+  return finisher.call(this, tt.num, val)
 }
 
 // Read a string value, interpreting backslash-escapes.
@@ -584,7 +603,7 @@ pp.readCodePoint = function() {
   return code
 }
 
-pp.readString = function(quote) {
+pp.readString = function(quote, finisher) {
   let out = "", chunkStart = ++this.pos
   for (;;) {
     if (this.pos >= this.input.length) this.raise(this.start, "Unterminated string constant")
@@ -607,7 +626,7 @@ pp.readString = function(quote) {
     }
   }
   out += this.input.slice(chunkStart, this.pos++)
-  return this.finishToken(tt.string, out)
+  return finisher.call(this, tt.string, out)
 }
 
 // Reads template string tokens.

@@ -89,6 +89,45 @@ export class Parser {
     // Each element has two properties: 'declared' and 'used'.
     // When it exited from the outermost class definition, all used private names must be declared.
     this.privateNameStack = []
+
+    // These are used by the preprocess tokenizer.
+    this.preprocessParameterScope = null
+    this.preTokParameterScope = null
+    this.preprocessMacroParameterListMode = false
+    this.preprocessIsParsingPreprocess = false
+    this.preprocessStack = []
+    this.preprocessStackLastItem = null
+    this.preprocessOnlyTransformArgumentsForLastToken = null
+    this.preprocessDontConcatenate = false
+    this.preNotSkipping = true
+    this.preConcatenating = false
+    this.preIfLevel = []
+
+    this.preType = null
+    this.preVal = null
+    this.preStart = null
+    this.preEnd = null
+
+    this.preLastStart = null
+    this.preLastEnd = null
+
+    this.localLastEnd = null
+    this.firstEnd = null
+
+    this.preInput = null
+
+    // The start and end offsets of the current token.
+    // First tokstart is the same as tokStart except when the preprocessor finds a macro.
+    // Then the tokFirstStart points to the start of the token that will be replaced by the macro.
+    // tokStart then points at the macros first
+    // tokMacroOffset is the offset to the current macro for the current token
+    // tokPosMacroOffset is the offset to the current macro for the current tokPos
+
+    this.tokFirstStart = null
+    this.firstTokEnd = null
+    this.tokMacroOffset = null
+    this.tokPosMacroOffset = null
+    this.lastTokMacroOffset = null
   }
 
   parse() {

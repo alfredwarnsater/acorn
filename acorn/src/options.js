@@ -1,4 +1,4 @@
-import {hasOwn, isArray} from "./util.js"
+import {hasOwn, isArray, wordsRegexp} from "./util.js"
 import {SourceLocation} from "./locutil.js"
 
 // A second argument must be given to configure the parser process.
@@ -104,6 +104,47 @@ export const defaultOptions = {
   // #endif
   // etc...
   preprocess: false,
+  // Preprocess 'get include file' function. It should return an object with two attributes
+  // 'include': a string with the file to be included
+  // 'sourceFile': is optional and should be a string with the filename. It will
+  // be included in the locations property as 'source'
+  // Return null if file can't be found. The parser will raise an exception
+  preprocessGetIncludeFile: defaultGetIncludeFile,
+  // Preprocess add macro function
+  preprocessAddMacro: defaultAddMacro,
+  // Preprocess get macro function
+  preprocessGetMacro: defaultGetMacro,
+  // Preprocess undefine macro function. To delete a macro
+  preprocessUndefineMacro: defaultUndefineMacro,
+  // Preprocess is macro function
+  preprocessIsMacro: defaultIsMacro
+}
+
+// Macro store default implementation
+
+let macros = Object.create(null)
+let macrosIsRegEx
+
+function defaultGetIncludeFile(filename) {
+  return {include: "#define FOO(x) x\n", sourceFile: filename}
+}
+
+function defaultAddMacro(macro) {
+  macros[macro.identifier] = macro
+  macrosIsRegEx = null
+}
+
+function defaultGetMacro(macroIdentifier) {
+  return macros[macroIdentifier]
+}
+
+function defaultUndefineMacro(macroIdentifier) {
+  delete macros[macroIdentifier]
+  macrosIsRegEx = null
+}
+
+function defaultIsMacro(macroIdentifier) {
+  return (macrosIsRegEx || (macrosIsRegEx = wordsRegexp(Object.keys(macros).concat(Object.keys(macrosBuiltinMacros).filter(function(key) { return this[key]().macro != null }, macrosBuiltinMacros)).join(" ")))).test(macroIdentifier)
 }
 
 // Interpret and default an options object
