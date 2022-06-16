@@ -151,24 +151,31 @@ export const types = {
   _delete: kw("delete", {beforeExpr: true, prefix: true, startsExpr: true})
 }
 
+export const preKeywords = {}
+
+function pkw(name, options = {}) {
+  options.keyword = name
+  return preKeywords[name] = new TokenType(name, options)
+}
+
 export const preTypes = {
   // Preprocessor token types.
-  _preDefine: kw("define"),
-  _preUndef: kw("undef"),
-  _preIfdef: kw("ifdef"),
-  _preIfndef: kw("ifndef"),
-  _preIf: kw("if"),
-  _preElse: kw("else"),
-  _preEndif: kw("endif"),
-  _preElseIf: kw("elif"),
-  _preElseIfTrue: kw("elif (True)"),
-  _preElseIfFalse: kw("elif (false)"),
-  _prePragma: kw("pragma"),
-  _preDefined: kw("defined"),
-  _preBackslash: kw("\\"),
-  _preError: kw("error"),
-  _preWarning: kw("warning"),
-  _preprocessParamItem: kw("preprocessParamItem", {type: "preprocessParamItem"}), // FIXME: type is not used anymore
-  _preprocessSkipLine: kw("skipLine", {type: "skipLine"}), // FIXME: type is not used anymore
-  _preInclude: kw("include")
+  _preDefine: pkw("define"),
+  _preUndef: pkw("undef"),
+  _preIfdef: pkw("ifdef"),
+  _preIfndef: pkw("ifndef"),
+  _preIf: pkw("if"),
+  _preElse: pkw("else"),
+  _preEndif: pkw("endif"),
+  _preElseIf: pkw("elif"),
+  _preElseIfTrue: pkw("elif (True)"),
+  _preElseIfFalse: pkw("elif (false)"),
+  _prePragma: pkw("pragma"),
+  _preDefined: pkw("defined"),
+  _preBackslash: pkw("\\"),
+  _preError: pkw("error"),
+  _preWarning: pkw("warning"),
+  _preprocessParamItem: pkw("preprocessParamItem", {type: "preprocessParamItem"}), // FIXME: type is not used anymore
+  _preprocessSkipLine: pkw("skipLine", {type: "skipLine"}), // FIXME: type is not used anymore
+  _preInclude: pkw("include")
 }

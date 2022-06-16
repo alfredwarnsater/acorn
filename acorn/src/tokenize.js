@@ -1,5 +1,5 @@
 import {isIdentifierStart, isIdentifierChar} from "./identifier.js"
-import {types as tt, keywords as keywordTypes} from "./tokentype.js"
+import {types as tt, keywords as keywordTypes, preTypes as ptt} from "./tokentype.js"
 import {Parser} from "./state.js"
 import {SourceLocation} from "./locutil.js"
 import {RegExpValidationState} from "./regexp.js"
@@ -313,7 +313,7 @@ pp.readToken_question = function() { // '?'
   return this.finishOp(tt.question, 1)
 }
 
-pp.readToken_numberSign = function() { // '#'
+pp.readToken_numberSign = function(finisher) { // '#'
   const ecmaVersion = this.options.ecmaVersion
   let code = 35 // '#'
   let numberSignPos = this.pos++
@@ -321,23 +321,70 @@ pp.readToken_numberSign = function() { // '#'
   let wordStartCode = this.fullCharCodeAtPos()
   let errorPos = numberSignPos
   let word = this.readWord1()
-  if (this.options.preprocess) {
+  preprocess: if (this.options.preprocess) {
     // Check if it is the first token on the line
     lineBreak.lastIndex = 0
     let match = lineBreak.exec(this.input.slice(this.lastTokEnd, numberSignPos))
     if (this.lastTokEnd === 0 || this.lastTokEnd === numberSignPos || match) {
       switch (word) {
-      case "pragma":
-        this.preprocesSkipRestOfLine()
-        break
+        case "pragma":
+          this.preprocesSkipRestOfLine()
+          break
 
-      case "define":
-        debugger
-        this.preprocessParseDefine()
-        break
+        case "define":
+          this.preprocessParseDefine()
+          break
 
-      default:
-        break
+        case "ifdef":
+          if (this.preNotSkipping) {
+            this.preIfLevel.push(ptt._preIf)
+            this.preprocessReadToken()
+            let identifer = this.preprocessGetIdent()
+            let isMacro = this.options.preprocessIsMacro(identifer)
+
+            if (!isMacro) {
+              this.preNotSkipping = false
+              this.preprocessSkipToElseOrEndif()
+            }
+          } else {
+            return finisher.call(this, ptt._preIfdef)
+          }
+          break
+
+        case "else":
+          if (this.preIfLevel.length) {
+            if (this.preNotSkipping) {
+              if (this.preIfLevel[this.preIfLevel.length - 1] === ptt._preIf) {
+                this.preIfLevel[this.preIfLevel.length - 1] = ptt._preElse
+                this.preNotSkipping = false
+                finisher.call(this, ptt._preElse)
+                this.preprocessReadToken()
+                this.preprocessSkipToElseOrEndif(true) // no else
+              } else
+                this.raise(this.preTokStart, "#else after #else")
+            } else {
+              this.preIfLevel[this.preIfLevel.length - 1] = ptt._preElse
+              return finisher.call(this, ptt._preElse)
+            }
+          } else
+            this.raise(this.preTokStart, "#else without #if")
+          break
+
+        case "endif":
+          if (this.preIfLevel.length) {
+            if (this.preNotSkipping) {
+            this.preIfLevel.pop();
+              break;
+            }
+          } else {
+            this.raise(this.preTokStart, "#endif without #if");
+          }
+          return finisher.call(this, ptt._preEndif);
+          break;
+
+
+        default:
+          break preprocess
       }
       this.preprocessFinishToken(this.preType, null, null, true)
       return this.nextToken()
@@ -351,7 +398,6 @@ pp.readToken_numberSign = function() { // '#'
       return this.finishToken(tt.privateId, word)
     }
   }
-
   this.raise(errorPos, "Unexpected character '" + codePointToString(code) + "'")
 }
 
@@ -427,7 +473,7 @@ pp.getTokenFromCode = function(code, finisher = this.finishToken, allowEndOfLine
     return this.finishOp(tt.prefix, 1, finisher)
 
   case 35: // '#'
-    return this.readToken_numberSign()
+    return this.readToken_numberSign(finisher)
   }
   if (allowEndOfLineToken) {
     if (code === 13 || code === 10 || code === 8232 || code === 8233) {

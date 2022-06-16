@@ -1,7 +1,8 @@
-import {types as tt, keywords} from "./tokentype.js"
+import {types as tt, preTypes as ptt, keywords} from "./tokentype.js"
 import {Parser} from "./state.js"
 import {isIdentifierStart, nonASCIIidentifierStart} from "./identifier.js"
 import {nonASCIIwhitespace, lineBreak} from "./whitespace.js"
+import {Macro} from "./preprocess-macro.js"
 
 const pp = Parser.prototype
 
@@ -30,24 +31,6 @@ export class PositionOffset {
         if (macroCurrentLineStart) this.column += macroCurrentLineStart
       }
     }
-  }
-}
-
-export class Macro {
-  constructor(ident, macro, parameters, start, isArgument, parameterScope, variadicName, locationOffset, aSourceFile) {
-    this.identifier = ident
-    if (macro != null) this.macro = macro
-    if (parameters) this.parameters = parameters
-    if (start != null) this.start = start
-    if (isArgument) this.isArgument = true
-    if (parameterScope) this.parameterScope = parameterScope
-    if (variadicName) this.variadicName = variadicName
-    if (locationOffset) this.locationOffset = locationOffset
-    if (aSourceFile) this.sourceFile = aSourceFile
-  }
-
-  isParameterFunction() {
-    return this.isParameterFunctionVar || (this.isParameterFunctionVar = makePredicate((this.parameters || []).join(" ")))
   }
 }
 
@@ -114,51 +97,6 @@ pp.preprocesSkipRestOfLine = function() {
   }
 }
 
-pp.preprocessParseDefine = function() {
-  this.preprocessIsParsingPreprocess = true
-  this.preprocessReadToken()
-
-  let macroIdentifierEnd = this.preEnd
-
-  // We don't want to concatenate tokens when creating macros
-  this.preprocessDontConcatenate = true
-
-  // Get position offset now as ´tokCurLine´ and ´tokLineStart´ points to next token.
-  let positionOffset = this.options.locations && new PositionOffset(this.curLine, this.lineStart, this.preprocessStackLastItem)
-  let macroIdentifier = this.preVal // this.preprocessGetIdent();
-  // '(' Must follow directly after identifier to be a valid macro with parameters
-  let isNextCodeParenL = this.input.charCodeAt(macroIdentifierEnd) === 40 // '('
-  this.preprocessExpect(tt.name, "Preprocessor #define expects identifier")
-  let parameters
-  let variadic
-  if (isNextCodeParenL) {
-    this.preprocessExpect(tt.parenL)
-    parameters = []
-    variadic = false
-    let first = true
-    while (!this.preprocessEat(tt.parenR)) {
-      if (variadic) this.raise(this.preStart, "Variadic parameter must be last")
-      if (!first) this.preprocessExpect(tt.comma, "Expected ',' between macro parameters"); else first = false
-      parameters.push(this.preprocessEat(tt.ellipsis) ? variadic = true && "__VA_ARGS__" : this.preprocessGetIdent())
-      if (this.preprocessEat(tt.ellipsis)) variadic = true
-      // Get a new position offset as macro has parameters. This is needed if line has escaped (backslash) newline
-      positionOffset = this.options.locations && new PositionOffset(this.curLine, this.lineStart, this.preprocessStackLastItem)
-    }
-  }
-
-  let start = this.preStart
-
-  while (this.preType !== tt.eol && this.preType !== tt.eof)
-    this.preprocessReadToken()
-
-  this.preprocessDontConcatenate = false
-  let macroString = this.preInput.slice(start, this.preStart)
-  macroString = macroString.replace(/\\/g, " ")
-  // If variadic get the last parameter for the variadic parameter name
-  this.options.preprocessAddMacro(new Macro(macroIdentifier, macroString, parameters, start, false, null, variadic && parameters[parameters.length - 1], positionOffset))
-  this.preprocessIsParsingPreprocess = false
-}
-
 // preprocessToken is used to cancel preNotSkipping when calling from readToken_preprocess.
 // FIXME: Refactor to not use this parameter preprocessToken. It is kind of confusing and it should be possible to do in another way
 pp.preprocessReadToken = function(skipComments, preprocessToken, processMacros, onlyTransformMacroArguments) {
@@ -171,7 +109,7 @@ pp.preprocessReadToken = function(skipComments, preprocessToken, processMacros, 
   if (!preprocessToken && !this.preNotSkipping && code !== 35) { // '#'
     // If we are skipping take the whole line if the token does not start with '#' (preprocess tokens)
     this.preprocesSkipRestOfLine()
-    this.preprocessFinishToken(tt._preprocessSkipLine, this.input.slice(this.preStart, this.pos))
+    this.preprocessFinishToken(ptt._preprocessSkipLine, this.input.slice(this.preStart, this.pos))
     this.preprocessSkipSpace(true, true) // Don't skip comments and skip EOL
     return
   } else if (this.preprocessMacroParameterListMode && code !== 41 && code !== 44) { // ')', ','
@@ -198,7 +136,7 @@ pp.preprocessReadToken = function(skipComments, preprocessToken, processMacros, 
     return this.preprocessFinishToken(tt._preprocessParamItem, this.input.slice(this.preStart, this.pos))
   }
   if (isIdentifierStart(code, this.options.ecmaVersion >= 6) || (code === 92 /* '\' */ && this.input.charCodeAt(this.pos + 1) === 117 /* 'u' */)) return this.preprocessReadWord(processMacros)
-  if (this.getTokenFromCode(code, skipComments ? preprocessFinishTokenSkipComments : this.preprocessFinishToken, true) === false) { // Allow _eol token
+  if (this.getTokenFromCode(code, skipComments ? this.preprocessFinishTokenSkipComments : this.preprocessFinishToken, true) === false) { // Allow _eol token
     // If we are here, we either found a non-ASCII identifier
     // character, or something that's entirely disallowed.
     let ch = String.fromCharCode(code)
@@ -281,7 +219,7 @@ function readMacroWord(word, nextFinisher, onlyTransformArguments, forceRegexp) 
         }
       }
     } else {
-      macro = preprocessBuiltinMacro(word)
+      macro = this.preprocessBuiltinMacro(word)
     }
   }
   if (macro) {
@@ -455,20 +393,9 @@ function readTokenFromMacro(macro, macroOffset, parameters, parameterScope, end,
   return true
 }
 
-let macrosMakeBuiltin = function(name, macro, endPos) { return new Macro(name, macro, null, endPos - name.length) }
-
-export const macrosBuiltinMacros = {
-  __OBJJ__: function(parser) { return macrosMakeBuiltin("__OBJJ__", parser.options.objj ? "1" : null, parser.pos) }
-}
-
-macrosBuiltinMacros["__" + "BROWSER" + "__"] = function(parser) { return macrosMakeBuiltin("__BROWSER__", (typeof window) !== "undefined" ? "1" : null, parser.pos) }
-macrosBuiltinMacros["__" + "LINE" + "__"] = function(parser) { return macrosMakeBuiltin("__LINE__", String(parser.options.locations ? parser.curLine : parser.getLineInfo(parser.input, parser.pos).line), parser.pos) }
-macrosBuiltinMacros["__" + "DATE" + "__"] = function(parser) { let date, day; return macrosMakeBuiltin("__DATE__", (date = new Date(), day = String(date.getDate()), ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][date.getMonth()] + (day.length > 1 ? " " : "  ") + day + " " + date.getFullYear()), parser.pos) }
-macrosBuiltinMacros["__" + "TIME" + "__"] = function(parser) { let date; return macrosMakeBuiltin("__TIME__", (date = new Date(), ("0" + date.getHours()).slice(-2) + ":" + ("0" + date.getMinutes()).slice(-2) + ":" + ("0" + date.getSeconds()).slice(-2)), parser.pos) }
-
-function preprocessBuiltinMacro(macroIdentifier) {
-  let builtinMacro = macrosBuiltinMacros[macroIdentifier]
-  return builtinMacro ? builtinMacro() : null
+pp.preprocessBuiltinMacro = function(macroIdentifier) {
+  let builtinMacro = this.macrosBuiltinMacros[macroIdentifier]
+  return builtinMacro ? builtinMacro(this) : null
 }
 
 // Push macro to stack and reset tokPos etc.
@@ -492,7 +419,7 @@ pp.pushMacroToStack = function(macro, macroString, macroOffset, parameters, para
   if (macro.sourceFile) this.sourceFile = macro.sourceFile
 }
 // FIXME: Find out if this is really used?
-function preprocessFinishTokenSkipComments(type, val) {
+pp.preprocessFinishTokenSkipComments = function(type, val) {
   this.preType = type
   this.preVal = val
   this.firstTokEnd = this.preEnd = this.pos

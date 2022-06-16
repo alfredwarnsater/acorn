@@ -4,6 +4,7 @@ import {lineBreak} from "./whitespace.js"
 import {getOptions} from "./options.js"
 import {wordsRegexp} from "./util.js"
 import {SCOPE_TOP, SCOPE_FUNCTION, SCOPE_ASYNC, SCOPE_GENERATOR, SCOPE_SUPER, SCOPE_DIRECT_SUPER, SCOPE_CLASS_STATIC_BLOCK} from "./scopeflags.js"
+import {Macro} from "./preprocess-macro.js"
 
 export class Parser {
   constructor(options, input, startPos) {
@@ -128,6 +129,44 @@ export class Parser {
     this.tokMacroOffset = null
     this.tokPosMacroOffset = null
     this.lastTokMacroOffset = null
+
+    function macrosMakeBuiltin(name, macro, endPos) { return new Macro(name, macro, null, endPos - name.length) }
+
+    if (this.options.preprocess) {
+      let self = this
+      let macros = Object.create(null)
+      let macrosIsRegEx
+      if (this.options.preprocessAddMacro == null) {
+        this.options.preprocessAddMacro = function(macro) {
+          macros[macro.identifier] = macro
+          macrosIsRegEx = null
+        }
+      }
+      if (this.options.preprocessGetMacro == null) {
+        this.options.preprocessGetMacro = function(macroIdentifier) {
+          return macros[macroIdentifier]
+        }
+      }
+      if (this.options.preprocessUndefineMacro == null) {
+        this.options.preprocessUndefineMacro = function defaultUndefineMacro(macroIdentifier) {
+          delete macros[macroIdentifier]
+          macrosIsRegEx = null
+        }
+      }
+      if (this.options.preprocessIsMacro == null) {
+        this.options.preprocessIsMacro = function(macroIdentifier) {
+          return (macrosIsRegEx || (macrosIsRegEx = wordsRegexp(Object.keys(macros).concat(Object.keys(self.macrosBuiltinMacros).filter(function(key) { return this[key]().macro != null }, self.macrosBuiltinMacros)).join(" ")))).test(macroIdentifier)
+        }
+      }
+      this.macrosBuiltinMacros = {
+        __OBJJ__: function() { return macrosMakeBuiltin("__OBJJ__", self.options.objj ? "1" : null, self.pos) }
+      }
+
+      this.macrosBuiltinMacros["__" + "BROWSER" + "__"] = function() { return macrosMakeBuiltin("__BROWSER__", (typeof window) !== "undefined" ? "1" : null, self.pos) }
+      this.macrosBuiltinMacros["__" + "LINE" + "__"] = function() { return macrosMakeBuiltin("__LINE__", String(self.options.locations ? self.curLine : self.getLineInfo(self.input, self.pos).line), self.pos) }
+      this.macrosBuiltinMacros["__" + "DATE" + "__"] = function() { let date, day; return macrosMakeBuiltin("__DATE__", (date = new Date(), day = String(date.getDate()), ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][date.getMonth()] + (day.length > 1 ? " " : "  ") + day + " " + date.getFullYear()), self.pos) }
+      this.macrosBuiltinMacros["__" + "TIME" + "__"] = function() { let date; return macrosMakeBuiltin("__TIME__", (date = new Date(), ("0" + date.getHours()).slice(-2) + ":" + ("0" + date.getMinutes()).slice(-2) + ":" + ("0" + date.getSeconds()).slice(-2)), self.pos) }
+    }
   }
 
   parse() {

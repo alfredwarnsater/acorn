@@ -3,37 +3,53 @@ if (typeof exports !== "undefined") {
     var testFail = require("./driver.js").testFail
 }
 
-// #pragma is accepted but ignored
-test("#pragma mark -\nx = 7;\n", {
+test("#define martin\n#ifdef carlberg\nvar b;\n#else\n#ifdef martin\nthis\n#else\nvar i;\n#endif\n#endif\n", {
   type: "Program",
   start: 0,
-  end: 22,
+  end: 90,
+  loc: {
+    start: {
+      line: 1,
+      column: 0
+    },
+    end: {
+      line: 11,
+      column: 0
+    }
+  },
   body: [
     {
       type: "ExpressionStatement",
-      start: 15,
-      end: 21,
-      expression: {
-        type: "AssignmentExpression",
-        start: 15,
-        end: 20,
-        operator: "=",
-        left: {
-          type: "Identifier",
-          start: 15,
-          end: 16,
-          name: "x"
+      start: 58,
+      end: 62,
+      loc: {
+        start: {
+          line: 6,
+          column: 0
         },
-        right: {
-          type: "Literal",
-          start: 19,
-          end: 20,
-          value: 7,
-          raw: "7"
+        end: {
+          line: 6,
+          column: 4
+        },
+      },
+      expression: {
+        type: "ThisExpression",
+        start: 58,
+        end: 62,
+        loc: {
+          start: {
+            line: 6,
+            column: 0
+          },
+          end: {
+            line: 6,
+            column: 4
+          },
         }
       }
     }
   ]
 }, {
+  locations: true,
   preprocess: true
 });
