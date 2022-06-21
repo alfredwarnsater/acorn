@@ -161,7 +161,7 @@ pp.preprocessReadWord = function(processMacros, onlyTransformMacroArguments) {
 
 // If the word is a macro return true as the token is already finished. If not just return 'undefined'.
 
-function readMacroWord(word, nextFinisher, onlyTransformArguments, forceRegexp) {
+pp.readMacroWord = function(word, nextFinisher, onlyTransformArguments, forceRegexp) {
   let macro,
       lastStackItem = this.preprocessStackLastItem,
       oldParameterScope = this.preprocessParameterScope
@@ -299,7 +299,7 @@ function readMacroWord(word, nextFinisher, onlyTransformArguments, forceRegexp) 
         // preprocessExpect(_parenR);
       }
       // If the macro defines anything add it to the preprocess input stack
-      return readTokenFromMacro(macro, this.tokPosMacroOffset, parameters, oldParameterScope, this.pos, nextFinisher, onlyTransformArguments, forceRegexp)
+      return this.readTokenFromMacro(macro, this.tokPosMacroOffset, parameters, oldParameterScope, this.pos, nextFinisher, onlyTransformArguments, forceRegexp)
     }
   }
 }
@@ -376,7 +376,7 @@ function preprocessPrescanFor(first, second) {
 
 // Push macro to stack and start read from it.
 // Just read next token if the macro is empty
-function readTokenFromMacro(macro, macroOffset, parameters, parameterScope, end, nextFinisher, onlyTransformArguments, forceRegexp) {
+pp.readTokenFromMacro = function(macro, macroOffset, parameters, parameterScope, end, nextFinisher, onlyTransformArguments, forceRegexp) {
   let macroString = macro.macro
   // If we are evaluation a macro expresion an empty macro definition means true or '1'
   if (!macroString && nextFinisher === this.preprocessNext) macroString = "1"
@@ -389,7 +389,7 @@ function readTokenFromMacro(macro, macroOffset, parameters, parameterScope, end,
   }
   // Now read the next token
   this.skipSpace()
-  nextFinisher(true, onlyTransformArguments, forceRegexp, true) // Stealth and Preprocess macros
+  nextFinisher.call(this, true, onlyTransformArguments, forceRegexp, true) // Stealth and Preprocess macros
   return true
 }
 
@@ -402,14 +402,13 @@ pp.preprocessBuiltinMacro = function(macroIdentifier) {
 // macroString is the string from the macro. It is usually 'macro.macro' but the caller can modify it if needed
 // includeFile is true if the macro should be treated as a regular file. In other words don't stringify words after '#'
 pp.pushMacroToStack = function(macro, macroString, macroOffset, parameters, parameterScope, end, onlyTransformArguments, isIncludeFile) {
-  this.preprocessStackLastItem = {macro: macro, macroOffset: macroOffset, parameterDict: parameters, /* start: macroStart, */ end: end, lastEnd: this.localLastEnd, inputLen: this.input.length, tokStart: this.start, onlyTransformArgumentsForLastToken: this.preprocessOnlyTransformArgumentsForLastToken, currentLine: this.curLine, currentLineStart: this.line, sourceFile: this.sourceFile}
+  this.preprocessStackLastItem = {macro: macro, macroOffset: macroOffset, parameterDict: parameters, /* start: macroStart, */ end: end, lastEnd: this.localLastEnd, tokStart: this.start, onlyTransformArgumentsForLastToken: this.preprocessOnlyTransformArgumentsForLastToken, currentLine: this.curLine, currentLineStart: this.line, sourceFile: this.sourceFile}
   if (parameterScope) this.preprocessStackLastItem.parameterScope = parameterScope
   if (isIncludeFile) this.preprocessStackLastItem.isIncludeFile = isIncludeFile
   this.preprocessStackLastItem.input = this.input
   this.preprocessStack.push(this.preprocessStackLastItem)
   this.preprocessOnlyTransformArgumentsForLastToken = onlyTransformArguments
   this.input = macroString
-  this.input.length = macroString.length
   this.tokPosMacroOffset = macro.start
   this.pos = 0
   this.curLine = 1

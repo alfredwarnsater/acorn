@@ -27,6 +27,32 @@ pp.startNodeAt = function(pos, loc) {
   return new Node(this, pos, loc)
 }
 
+// Start a node whose start offset/comments information should be
+// based on the start of another node. For example, a binary
+// operator node is only started after its left-hand side has
+// already been parsed.
+
+pp.startNodeFrom = function(other) {
+  var node = new Node(this)
+  node.start = other.start;
+  if (other.commentsBefore) {
+    node.commentsBefore = other.commentsBefore;
+    delete other.commentsBefore;
+  }
+  if (other.spacesBefore) {
+    node.spacesBefore = other.spacesBefore;
+    delete other.spacesBefore;
+  }
+  if (this.options.locations) {
+    node.loc = new SourceLocation();
+    node.loc.start = other.loc.start;
+  }
+  if (this.options.ranges)
+    node.range = [other.range[0], 0];
+
+  return node;
+}
+
 // Finish an AST node, adding `type` and `end` properties.
 
 function finishNodeAt(node, type, pos, loc) {

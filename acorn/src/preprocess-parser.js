@@ -76,7 +76,7 @@ pp.preprocessSkipToElseOrEndif = function(skipElse) {
       ifLevel.pop()
       break
 
-    case ptt._eof:
+    case tt.eof:
       this.preNotSkipping = true
       this.raise(this.preStart, "Missing #endif")
     }
@@ -85,4 +85,228 @@ pp.preprocessSkipToElseOrEndif = function(skipElse) {
   this.preNotSkipping = true
   if (this.preType === ptt._preEndif)
     this.preIfLevel.pop()
+}
+
+// Parse an  expression — either a single token that is an
+// expression, an expression started by a keyword like `defined`,
+// or an expression wrapped in punctuation like `()`.
+// When `processMacros` is true any macros will we transformed to its definition
+
+pp.preprocessParseExpression = function(processMacros) {
+  return this.preprocessParseExprOps(processMacros);
+}
+
+// Start the precedence parser.
+
+pp.preprocessParseExprOps = function(processMacros) {
+  return this.preprocessParseExprOp(this.preprocessParseMaybeUnary(processMacros), -1, processMacros);
+}
+
+// Parse binary operators with the operator precedence parsing
+// algorithm. `left` is the left-hand side of the operator.
+// `minPrec` provides context that allows the function to stop and
+// defer further parser to one of its callers when it encounters an
+// operator that has a lower precedence than the set it is parsing.
+
+pp.preprocessParseExprOp = function(left, minPrec, processMacros) {
+  var prec = this.preType.binop;
+  if (prec) {
+    if (!this.preType.preprocess) this.raise(this.preStart, "Unsupported macro operator");
+    if (prec > minPrec) {
+      var node = this.startNodeFrom(left);
+      node.left = left;
+      node.operator = this.preVal;
+      this.preprocessNext(false, false, null, processMacros);
+      node.right = this.preprocessParseExprOp(this.preprocessParseMaybeUnary(processMacros), prec, processMacros);
+      var node = this.preprocessFinishNode(node, /&&|\|\|/.test(node.operator) ? "LogicalExpression" : "BinaryExpression");
+      return this.preprocessParseExprOp(node, minPrec, processMacros);
+    }
+  }
+  return left;
+}
+
+// Parse an unary expression if possible
+
+pp.preprocessParseMaybeUnary = function(processMacros) {
+  if (this.preType.preprocess && this.preType.prefix) {
+    let node = this.startNode();
+    node.operator = this.preVal;
+    node.prefix = true;
+    this.preprocessNext(false, false, null, processMacros);
+    node.argument = this.preprocessParseMaybeUnary(processMacros);
+    return this.preprocessFinishNode(node, "UnaryExpression");
+  }
+  return this.preprocessParseExprAtom(processMacros);
+}
+
+// Parse an atomic macro expression — either a single token that is an
+// expression, an expression started by a keyword like `defined`,
+// or an expression wrapped in punctuation like `()`.
+
+pp.preprocessParseExprAtom = function(processMacros) {
+  switch (this.preType) {
+  case tt.name:
+    return this.preprocessParseIdent(processMacros)
+
+  case tt.num: case tt.string:
+    return this.preprocessParseStringNumLiteral(processMacros)
+
+  case tt.parenL:
+    let tokStart1 = this.preStart
+    this.preprocessNext(false, false, null, processMacros)
+    let val = this.preprocessParseExpression(processMacros)
+    val.start = tokStart1
+    val.end = this.preEnd
+    this.preprocessExpect(tt.parenR, "Expected closing ')' in macro expression", processMacros)
+    return val;
+
+  case tt._preDefined:
+    let node = this.startNode();
+    this.preprocessNext(false, false, null, processMacros);
+    node.object = this.preprocessParseDefinedExpression(processMacros);
+    return this.preprocessFinishNode(node, "DefinedExpression");
+
+  default:
+    this.unexpected();
+  }
+}
+
+// Parse an 'Defined' macro expression — either a single token that is an
+// identifier, number, string or an expression wrapped in punctuation like `()`.
+
+function preprocessParseDefinedExpression(processMacros) {
+  switch (preTokType) {
+  case _name:
+    return preprocessParseIdent(processMacros);
+
+  case _num: case _string:
+    return preprocessParseStringNumLiteral(processMacros);
+
+  case _parenL:
+    var tokStart1 = preTokStart;
+    preprocessNext(false, false, null, processMacros);
+    var val = preprocessParseDefinedExpression(processMacros);
+    val.start = tokStart1;
+    val.end = preTokEnd;
+    preprocessExpect(_parenR, "Expected closing ')' in macro expression", processMacros);
+    return val;
+
+  default:
+    unexpected();
+  }
+}
+
+pp.preprocessParseStringNumLiteral = function(processMacros) {
+  var node = this.startNode();
+  node.value = this.preVal;
+  node.raw = this.preInput.slice(this.preStart, this.preEnd);
+  this.preprocessNext(false, false, null, processMacros);
+  return this.preprocessFinishNode(node, "Literal");
+}
+
+pp.preprocessFinishNode = function(node, type) {
+  node.type = type;
+  node.end = this.preEnd;
+  return node;
+}
+
+pp.preprocessEvalExpression = function(expr) {
+  // A recursive walk is one where your functions override the default
+  // walkers. They can modify and replace the state parameter that's
+  // threaded through the walk, and can opt how and whether to walk
+  // their child nodes (by calling their third argument on these
+  // nodes).
+  function recursiveWalk(node, state, funcs) {
+    var visitor = funcs;
+    function c(node, st, override) {
+      return visitor[override || node.type](node, st, c);
+    }
+    return c(node, state);
+  };
+
+  return recursiveWalk(expr, {}, {
+    LogicalExpression: function(node, st, c) {
+      var left = node.left, right = node.right;
+      switch (node.operator) {
+        case "||":
+          return c(left, st) || c(right, st);
+        case "&&":
+          return c(left, st) && c(right, st);
+      }
+    },
+    BinaryExpression: function(node, st, c) {
+      var left = node.left, right = node.right;
+      switch(node.operator) {
+        case "+":
+          return c(left, st) + c(right, st);
+        case "-":
+          return c(left, st) - c(right, st);
+        case "*":
+          return c(left, st) * c(right, st);
+        case "/":
+          return c(left, st) / c(right, st);
+        case "%":
+          return c(left, st) % c(right, st);
+        case "<":
+          return c(left, st) < c(right, st);
+        case ">":
+          return c(left, st) > c(right, st);
+        case "^":
+          return c(left, st) ^ c(right, st);
+        case "&":
+          return c(left, st) & c(right, st);
+        case "|":
+          return c(left, st) | c(right, st);
+        case "==":
+          return c(left, st) == c(right, st);
+        case "===":
+          return c(left, st) === c(right, st);
+        case "!=":
+          return c(left, st) != c(right, st);
+        case "!==":
+          return c(left, st) !== c(right, st);
+        case "<=":
+          return c(left, st) <= c(right, st);
+        case ">=":
+          return c(left, st) >= c(right, st);
+        case ">>":
+          return c(left, st) >> c(right, st);
+        case ">>>":
+          return c(left, st) >>> c(right, st);
+        case "<<":
+          return c(left, st) << c(right, st);
+        }
+    },
+    UnaryExpression: function(node, st, c) {
+      var arg = node.argument;
+      switch (node.operator) {
+        case "-":
+          return -c(arg, st);
+        case "+":
+          return +c(arg, st);
+        case "!":
+          return !c(arg, st);
+        case "~":
+          return ~c(arg, st);
+      }
+    },
+    Literal: function(node, st, c) {
+      return node.value;
+    },
+    Identifier: function(node, st, c) {
+      // If it is not macro expanded it should be counted as a zero
+      return 0;
+    },
+    DefinedExpression: function(node, st, c) {
+      var objectNode = node.object;
+      if (objectNode.type === "Identifier") {
+        // If the macro has parameters it will not expand and we have to check here if it exists
+        var name = objectNode.name,
+            macro = options.preprocessGetMacro(name) || preprocessBuiltinMacro(name);
+        return macro || 0;
+      } else {
+        return c(objectNode, st);
+      }
+    }
+  });
 }

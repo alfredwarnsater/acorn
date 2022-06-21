@@ -328,14 +328,39 @@ pp.readToken_numberSign = function(finisher) { // '#'
     if (this.lastTokEnd === 0 || this.lastTokEnd === numberSignPos || match) {
       switch (word) {
         case "pragma":
+          this.preStart = this.start
           this.preprocesSkipRestOfLine()
           break
 
         case "define":
+          this.preStart = this.start
           this.preprocessParseDefine()
           break
 
+        case "if":
+          this.preStart = this.start
+          if (this.preNotSkipping) {
+            // We dont't allow regex when parsing preprocess expression
+            // FIXME: Here we should probably use the context functionality.
+            let saveTokRegexpAllowed = this.exprAllowed;
+            this.exprAllowed = false
+            //this.tokRegexpAllowed = false;
+            this.preIfLevel.push(ptt._preIf);
+            this.preprocessReadToken(false, false, true);
+            let expr = this.preprocessParseExpression(true); // Process macros
+            let test = this.preprocessEvalExpression(expr);
+            if (!test) {
+              this.preNotSkipping = false;
+              this.preprocessSkipToElseOrEndif();
+            }
+            this.exprAllowed = saveTokRegexpAllowed;
+          } else {
+            return finisher.call(this, ptt._preIf);
+          }
+          break;
+
         case "ifdef":
+          this.preStart = this.start
           if (this.preNotSkipping) {
             this.preIfLevel.push(ptt._preIf)
             this.preprocessReadToken()
@@ -351,7 +376,52 @@ pp.readToken_numberSign = function(finisher) { // '#'
           }
           break
 
+        case "ifndef":
+          this.preStart = this.start
+          if (this.preNotSkipping) {
+            this.preIfLevel.push(ptt._preIf)
+            this.preprocessReadToken()
+            let identifer = this.preprocessGetIdent()
+            let isMacro = this.options.preprocessIsMacro(identifer)
+
+            if (isMacro) {
+              this.preNotSkipping = false
+              this.preprocessSkipToElseOrEndif()
+            }
+          } else {
+            return finisher.call(this, ptt._preIfdef)
+          }
+          break
+
+        case "elif":
+          this.preStart = this.start
+          if (this.preIfLevel.length) {
+            if (this.preNotSkipping) {
+              if(this.preIfLevel[this.preIfLevel.length - 1] === ptt._preIf) {
+                this.preNotSkipping = false;
+                finisher.call(this, ptt._preElseIf);
+                this.preprocessReadToken();
+                this.preprocessSkipToElseOrEndif(true); // no else
+              } else
+                this.raise(this.preStart, "#elsif after #else");
+            } else {
+              // We dont't allow regex when parsing preprocess expression
+              var saveTokRegexpAllowed = tokRegexpAllowed;
+              this.exprAllowed = false;
+              this.preNotSkipping = true;
+              this.preprocessReadToken(false, false, true);
+              var expr = this.preprocessParseExpression(true);
+              this.preNotSkipping = false;
+              this.tokRegexpAllowed = saveTokRegexpAllowed;
+              var test = this.preprocessEvalExpression(expr);
+              return finisher.call(this, test ? ptt._preElseIfTrue : ptt._preElseIfFalse);
+            }
+          } else
+            this.raise(preStart, "#elif without #if");
+          break;
+
         case "else":
+          this.preStart = this.start
           if (this.preIfLevel.length) {
             if (this.preNotSkipping) {
               if (this.preIfLevel[this.preIfLevel.length - 1] === ptt._preIf) {
@@ -361,33 +431,35 @@ pp.readToken_numberSign = function(finisher) { // '#'
                 this.preprocessReadToken()
                 this.preprocessSkipToElseOrEndif(true) // no else
               } else
-                this.raise(this.preTokStart, "#else after #else")
+                this.raise(this.preStart, "#else after #else")
             } else {
               this.preIfLevel[this.preIfLevel.length - 1] = ptt._preElse
               return finisher.call(this, ptt._preElse)
             }
           } else
-            this.raise(this.preTokStart, "#else without #if")
+            this.raise(this.preStart, "#else without #if")
           break
 
         case "endif":
+          this.preStart = this.start
           if (this.preIfLevel.length) {
             if (this.preNotSkipping) {
             this.preIfLevel.pop();
               break;
             }
           } else {
-            this.raise(this.preTokStart, "#endif without #if");
+            this.raise(this.preStart, "#endif without #if");
           }
           return finisher.call(this, ptt._preEndif);
           break;
-
 
         default:
           break preprocess
       }
       this.preprocessFinishToken(this.preType, null, null, true)
       return this.nextToken()
+    } else if (isPreKeyword.test(word)) {
+      this.raise(errorPos, "Preprocessor directives may only be used at the beginning of a line")
     }
   }
   if (ecmaVersion >= 13) {

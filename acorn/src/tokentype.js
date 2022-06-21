@@ -33,11 +33,12 @@ export class TokenType {
     this.postfix = !!conf.postfix
     this.binop = conf.binop || null
     this.updateContext = null
+    this.preprocess = !!conf.preprocess
   }
 }
 
 function binop(name, prec) {
-  return new TokenType(name, {beforeExpr: true, binop: prec})
+  return new TokenType(name, {beforeExpr: true, binop: prec, preprocess: true}) // FIXME: Should all binops really have preprocess: true?
 }
 const beforeExpr = {beforeExpr: true}, startsExpr = {startsExpr: true}
 
@@ -97,7 +98,7 @@ export const types = {
   eq: new TokenType("=", {beforeExpr: true, isAssign: true}),
   assign: new TokenType("_=", {beforeExpr: true, isAssign: true}),
   incDec: new TokenType("++/--", {prefix: true, postfix: true, startsExpr: true}),
-  prefix: new TokenType("!/~", {beforeExpr: true, prefix: true, startsExpr: true}),
+  prefix: new TokenType("!/~", {beforeExpr: true, prefix: true, startsExpr: true, preprocess: true}),
   logicalOR: binop("||", 1),
   logicalAND: binop("&&", 2),
   bitwiseOR: binop("|", 3),
@@ -106,7 +107,7 @@ export const types = {
   equality: binop("==/!=/===/!==", 6),
   relational: binop("</>/<=/>=", 7),
   bitShift: binop("<</>>/>>>", 8),
-  plusMin: new TokenType("+/-", {beforeExpr: true, binop: 9, prefix: true, startsExpr: true}),
+  plusMin: new TokenType("+/-", {beforeExpr: true, binop: 9, prefix: true, startsExpr: true, preprocess: true}),
   modulo: binop("%", 10),
   star: binop("*", 10),
   slash: binop("/", 10),
