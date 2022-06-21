@@ -20,7 +20,7 @@ export class Node {
 const pp = Parser.prototype
 
 pp.startNode = function() {
-  return new Node(this, this.start, this.startLoc)
+  return new Node(this, this.start + this.tokMacroOffset, this.startLoc)
 }
 
 pp.startNodeAt = function(pos, loc) {
@@ -66,7 +66,7 @@ function finishNodeAt(node, type, pos, loc) {
 }
 
 pp.finishNode = function(node, type) {
-  return finishNodeAt.call(this, node, type, this.lastTokEnd, this.lastTokEndLoc)
+  return finishNodeAt.call(this, node, type, this.lastTokEnd + this.lastTokMacroOffset, this.lastTokEndLoc)
 }
 
 // Finish node at given position

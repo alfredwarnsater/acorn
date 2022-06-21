@@ -263,14 +263,14 @@ lp.parseExprAtom = function() {
     let val = this.tok.value
     node.regex = {pattern: val.pattern, flags: val.flags}
     node.value = val.value
-    node.raw = this.input.slice(this.tok.start, this.tok.end)
+    node.raw = this.input.slice(this.tok.start + this.toks.tokMacroOffset, this.tok.end + this.toks.tokMacroOffset)
     this.next()
     return this.finishNode(node, "Literal")
 
   case tt.num: case tt.string:
     node = this.startNode()
     node.value = this.tok.value
-    node.raw = this.input.slice(this.tok.start, this.tok.end)
+    node.raw = this.input.slice(this.tok.start + this.toks.tokMacroOffset, this.tok.end + this.toks.tokMacroOffset)
     if (this.tok.type === tt.num && node.raw.charCodeAt(node.raw.length - 1) === 110) node.bigint = node.raw.slice(0, -1).replace(/_/g, "")
     this.next()
     return this.finishNode(node, "Literal")

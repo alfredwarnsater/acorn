@@ -1,5 +1,5 @@
 import {isIdentifierStart, isIdentifierChar} from "./identifier.js"
-import {types as tt, keywords as keywordTypes, preTypes as ptt} from "./tokentype.js"
+import {types as tt, keywords as keywordTypes, preTypes as ptt, isKeywordPreprocessor} from "./tokentype.js"
 import {Parser} from "./state.js"
 import {SourceLocation} from "./locutil.js"
 import {RegExpValidationState} from "./regexp.js"
@@ -39,6 +39,9 @@ pp.next = function(ignoreEscapeSequenceInKeyword) {
   this.lastTokStart = this.start
   this.lastTokEndLoc = this.endLoc
   this.lastTokStartLoc = this.startLoc
+  this.lastEndInput = this.input
+  this.lastEndOfFile = this.firstEndOfFile
+  this.lastTokMacroOffset = this.tokMacroOffset
   this.nextToken()
 }
 
@@ -70,6 +73,9 @@ if (typeof Symbol !== "undefined")
 pp.nextToken = function() {
   let curContext = this.curContext()
   if (!curContext || !curContext.preserveSpace) this.skipSpace()
+
+  this.tokInput = this.input
+  this.tokMacroOffset = this.tokPosMacroOffset
 
   this.start = this.pos
   if (this.options.locations) this.startLoc = this.curPosition()
@@ -128,7 +134,34 @@ pp.skipLineComment = function(startSkip) {
 
 pp.skipSpace = function(dontSkipEOL) {
   let ch
-  loop: while (this.pos < this.input.length) {
+  loop: while (true) {
+    if (this.pos >= this.input.length) {
+      if (this.options.preprocess) {
+        if (this.dontSkipMacroBoundary) return true;
+        if (!this.preprocessStack.length) break;
+        // If this is the first end of file after the token save to position to allow a semicolon to be inserted
+        // the end of file, if needed.
+        if (this.firstEndOfFile == null) this.firstEndOfFile = this.pos;
+        // If we are at the end of the input inside a macro continue at last position
+        var lastItem = this.preprocessStack.pop();
+        this.pos = lastItem.end;
+        this.input = lastItem.input;
+        this.curLine = lastItem.currentLine;
+        this.lineStart = lastItem.currentLineStart;
+        this.preprocessOnlyTransformArgumentsForLastToken = lastItem.onlyTransformArgumentsForLastToken;
+        this.preprocessParameterScope = lastItem.parameterScope;
+        this.tokPosMacroOffset = lastItem.macroOffset;
+        this.sourceFile = lastItem.sourceFile;
+        this.firstTokEnd = lastItem.lastEnd;
+
+        // Set the last item
+        var lastIndex = this.preprocessStack.length;
+        this.preprocessStackLastItem = lastIndex ? this.preprocessStack[lastIndex - 1] : null;
+        return this.skipSpace(dontSkipEOL);
+      } else {
+        break;
+      }
+    }
     ch = this.input.charCodeAt(this.pos)
     switch (ch) {
     case 32: case 160: // ' '
@@ -322,6 +355,10 @@ pp.readToken_numberSign = function(finisher) { // '#'
   let errorPos = numberSignPos
   let word = this.readWord1()
   preprocess: if (this.options.preprocess) {
+    if (word.length === 0) {
+      this.skipSpace()
+      word = this.readWord1()
+    }
     // Check if it is the first token on the line
     lineBreak.lastIndex = 0
     let match = lineBreak.exec(this.input.slice(this.lastTokEnd, numberSignPos))
@@ -458,7 +495,7 @@ pp.readToken_numberSign = function(finisher) { // '#'
       }
       this.preprocessFinishToken(this.preType, null, null, true)
       return this.nextToken()
-    } else if (isPreKeyword.test(word)) {
+    } else if (isKeywordPreprocessor.test(word)) {
       this.raise(errorPos, "Preprocessor directives may only be used at the beginning of a line")
     }
   }
@@ -954,9 +991,14 @@ pp.readWord1 = function() {
 // Read an identifier or keyword token. Will check for reserved
 // words when necessary.
 
-pp.readWord = function() {
-  let word = this.readWord1()
+pp.readWord = function(preReadWord, onlyTransformMacroArguments, forceRegexp) {
+  let word = preReadWord || this.readWord1()
   let type = tt.name
+  if (this.options.preprocess) {
+    var readMacroWordReturn = this.readMacroWord(word, this.nextToken, onlyTransformMacroArguments, forceRegexp);
+    if (readMacroWordReturn === true)
+      return true;
+  }
   if (this.keywords.test(word)) {
     type = keywordTypes[word]
   }

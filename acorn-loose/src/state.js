@@ -26,7 +26,7 @@ export class LooseParser {
   }
 
   startNode() {
-    return new Node(this.toks, this.tok.start, this.options.locations ? this.tok.loc.start : null)
+    return new Node(this.toks, this.tok.start + this.toks.tokMacroOffset, this.options.locations ? this.tok.loc.start : null)
   }
 
   storeCurrentPos() {
@@ -43,11 +43,11 @@ export class LooseParser {
 
   finishNode(node, type) {
     node.type = type
-    node.end = this.last.end
+    node.end = this.last.end + this.toks.lastTokMacroOffset
     if (this.options.locations)
       node.loc.end = this.last.loc.end
     if (this.options.ranges)
-      node.range[1] = this.last.end
+      node.range[1] = this.last.end + this.toks.lastTokMacroOffset
     return node
   }
 

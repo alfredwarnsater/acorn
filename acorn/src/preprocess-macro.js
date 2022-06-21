@@ -1,3 +1,5 @@
+import { wordsRegexp } from "./util.js"
+
 export class Macro {
   constructor(ident, macro, parameters, start, isArgument, parameterScope, variadicName, locationOffset, aSourceFile) {
     this.identifier = ident
@@ -12,6 +14,6 @@ export class Macro {
   }
 
   isParameterFunction() {
-    return this.isParameterFunctionVar || (this.isParameterFunctionVar = makePredicate((this.parameters || []).join(" ")))
+    return this.isParameterFunctionVar || (this.isParameterFunctionVar = wordsRegexp((this.parameters || []).join(" ")))
   }
 }

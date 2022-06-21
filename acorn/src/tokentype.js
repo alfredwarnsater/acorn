@@ -1,5 +1,7 @@
 // ## Token types
 
+import { wordsRegexp } from "./util"
+
 // The assignment of fine-grained, information-carrying type objects
 // allows the tokenizer to store the information it has about a
 // token in a way that is very cheap for the parser to look up.
@@ -169,14 +171,16 @@ export const preTypes = {
   _preElse: pkw("else"),
   _preEndif: pkw("endif"),
   _preElseIf: pkw("elif"),
-  _preElseIfTrue: pkw("elif (True)"),
-  _preElseIfFalse: pkw("elif (false)"),
+  _preElseIfTrue: new TokenType("elif (True)"),
+  _preElseIfFalse: new TokenType("elif (false)"),
   _prePragma: pkw("pragma"),
   _preDefined: pkw("defined"),
-  _preBackslash: pkw("\\"),
+  _preBackslash: new TokenType("\\"),
   _preError: pkw("error"),
   _preWarning: pkw("warning"),
-  _preprocessParamItem: pkw("preprocessParamItem", {type: "preprocessParamItem"}), // FIXME: type is not used anymore
-  _preprocessSkipLine: pkw("skipLine", {type: "skipLine"}), // FIXME: type is not used anymore
+  _preprocessParamItem: new TokenType("preprocessParamItem", {type: "preprocessParamItem"}), // FIXME: type is not used anymore
+  _preprocessSkipLine: new TokenType("skipLine", {type: "skipLine"}), // FIXME: type is not used anymore
   _preInclude: pkw("include")
 }
+
+export const isKeywordPreprocessor = wordsRegexp(Object.keys(preKeywords).join(" "))
