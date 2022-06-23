@@ -395,6 +395,11 @@ pp.readToken_numberSign = function(finisher) { // '#'
           this.preprocessParseDefine()
           break
 
+        case "undef":
+          this.preprocessReadToken()
+          this.options.preprocessUndefineMacro(this.preprocessGetIdent())
+          break
+
         case "if":
           this.preStart = this.start
           if (this.preNotSkipping) {
