@@ -192,6 +192,27 @@ pp.skipSpace = function(dontSkipEOL) {
         break loop
       }
       break
+    case 92: // '\'
+      if (!this.options.preprocess) break loop;
+      // Check if we have an escaped newline. We are using a relaxed treatment of escaped newlines like gcc.
+      // We allow spaces, horizontal and vertical tabs, and form feeds between the backslash and the subsequent newline
+      var pos = this.pos + 1
+      ch = this.input.charCodeAt(pos);
+      while (pos < this.input.length && (ch === 32 || ch === 9 || ch === 11 || ch === 12 || (ch >= 5760 && nonASCIIwhitespaceNoNewLine.test(String.fromCharCode(ch)))))
+        ch = this.input.charCodeAt(++pos)
+      lineBreak.lastIndex = 0
+      var match = lineBreak.exec(this.input.slice(pos, pos + 2))
+      if (match && match.index === 0) {
+        this.pos = pos + match[0].length
+        if (this.options.locations) {
+          ++this.curLine
+          this.lineStart = this.pos
+        }
+      } else {
+        break loop;
+      }
+      break loop
+
     default:
       if (ch > 8 && ch < 14 || ch >= 5760 && nonASCIIwhitespace.test(String.fromCharCode(ch))) {
         ++this.pos
