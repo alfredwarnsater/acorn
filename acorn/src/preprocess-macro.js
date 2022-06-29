@@ -1,4 +1,4 @@
-import { wordsRegexp } from "./util.js"
+import {wordsRegexp} from "./util.js"
 
 export class Macro {
   constructor(ident, macro, parameters, start, isArgument, parameterScope, variadicName, locationOffset, aSourceFile) {

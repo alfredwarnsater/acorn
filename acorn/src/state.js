@@ -167,6 +167,18 @@ export class Parser {
       this.macrosBuiltinMacros["__" + "LINE" + "__"] = function() { return macrosMakeBuiltin("__LINE__", String(self.options.locations ? self.curLine : getLineInfo(self.input, self.pos).line), self.pos) }
       this.macrosBuiltinMacros["__" + "DATE" + "__"] = function() { let date, day; return macrosMakeBuiltin("__DATE__", (date = new Date(), day = String(date.getDate()), ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][date.getMonth()] + (day.length > 1 ? " " : "  ") + day + " " + date.getFullYear()), self.pos) }
       this.macrosBuiltinMacros["__" + "TIME" + "__"] = function() { let date; return macrosMakeBuiltin("__TIME__", (date = new Date(), ("0" + date.getHours()).slice(-2) + ":" + ("0" + date.getMinutes()).slice(-2) + ":" + ("0" + date.getSeconds()).slice(-2)), self.pos) }
+
+      if (this.options.macros)
+        this.defineMacros(this.options.macros)
+
+      let preIncludeFiles = this.options.preIncludeFiles
+      if (preIncludeFiles && preIncludeFiles.length) for (let i = preIncludeFiles.length - 1; i >= 0; i--) {
+        let preIncludeFile = preIncludeFiles[i]
+
+        let preIncludeMacro = new Macro(null, preIncludeFile.include, null, 0, false, null, false, null, preIncludeFile.sourceFile)
+        this.pushMacroToStack(preIncludeMacro, preIncludeMacro.macro, 0, null, null, this.pos, null, true) // isIncludeFile
+        this.skipSpace()
+      }
     }
   }
 

@@ -117,7 +117,9 @@ export const defaultOptions = {
   // Preprocess undefine macro function. To delete a macro
   preprocessUndefineMacro: null,
   // Preprocess is macro function
-  preprocessIsMacro: null
+  preprocessIsMacro: null,
+  macros: null,
+  preIncludeFiles: null
 }
 
 // Macro store default implementation

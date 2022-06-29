@@ -1,6 +1,6 @@
 // ## Token types
 
-import { wordsRegexp } from "./util"
+import {wordsRegexp} from "./util"
 
 // The assignment of fine-grained, information-carrying type objects
 // allows the tokenizer to store the information it has about a
@@ -180,7 +180,9 @@ export const preTypes = {
   _preWarning: pkw("warning"),
   _preprocessParamItem: new TokenType("preprocessParamItem", {type: "preprocessParamItem"}), // FIXME: type is not used anymore
   _preprocessSkipLine: new TokenType("skipLine", {type: "skipLine"}), // FIXME: type is not used anymore
-  _preInclude: pkw("include")
+  _preInclude: pkw("include"),
+
+  _filename: pkw("filename")
 }
 
 export const isKeywordPreprocessor = wordsRegexp(Object.keys(preKeywords).join(" "))

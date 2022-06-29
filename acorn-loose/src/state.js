@@ -30,7 +30,7 @@ export class LooseParser {
   }
 
   storeCurrentPos() {
-    return this.options.locations ? [this.tok.start, this.tok.loc.start] : this.tok.start
+    return this.options.locations ? [this.tok.start + this.toks.tokMacroOffset, this.tok.loc.start] : this.tok.start + this.toks.tokMacroOffset
   }
 
   startNodeAt(pos) {

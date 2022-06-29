@@ -33,24 +33,24 @@ pp.startNodeAt = function(pos, loc) {
 // already been parsed.
 
 pp.startNodeFrom = function(other) {
-  var node = new Node(this)
-  node.start = other.start;
+  let node = new Node(this)
+  node.start = other.start
   if (other.commentsBefore) {
-    node.commentsBefore = other.commentsBefore;
-    delete other.commentsBefore;
+    node.commentsBefore = other.commentsBefore
+    delete other.commentsBefore
   }
   if (other.spacesBefore) {
-    node.spacesBefore = other.spacesBefore;
-    delete other.spacesBefore;
+    node.spacesBefore = other.spacesBefore
+    delete other.spacesBefore
   }
   if (this.options.locations) {
-    node.loc = new SourceLocation();
-    node.loc.start = other.loc.start;
+    node.loc = new SourceLocation()
+    node.loc.start = other.loc.start
   }
   if (this.options.ranges)
-    node.range = [other.range[0], 0];
+    node.range = [other.range[0], 0]
 
-  return node;
+  return node
 }
 
 // Finish an AST node, adding `type` and `end` properties.

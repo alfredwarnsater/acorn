@@ -70,7 +70,7 @@ pp.expectContextual = function(name) {
 pp.canInsertSemicolon = function() {
   return this.type === tt.eof ||
     this.type === tt.braceR ||
-    lineBreak.test(this.input.slice(this.lastTokEnd, this.start))
+    lineBreak.test(this.lastEndInput.slice(this.lastTokEnd, this.lastEndOfFile || this.tokFirstStart)) || this.lastEndOfFile != null
 }
 
 pp.insertSemicolon = function() {

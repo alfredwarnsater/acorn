@@ -1,4 +1,4 @@
-import {types as tt, preTypes as ptt, keywords, isKeywordPreprocessor} from "./tokentype.js"
+import {types as tt, preTypes as ptt, preKeywords, isKeywordPreprocessor} from "./tokentype.js"
 import {Parser} from "./state.js"
 import {isIdentifierStart, nonASCIIidentifierStart} from "./identifier.js"
 import {nonASCIIwhitespace, lineBreak} from "./whitespace.js"
@@ -99,12 +99,12 @@ pp.preprocessReadWord = function(processMacros, onlyTransformMacroArguments) {
   let type = tt.name
   let readMacroWordReturn
   if (processMacros && this.options.preprocess) {
-    readMacroWordReturn = readMacroWord(word, pp.preprocessNext, onlyTransformMacroArguments)
+    readMacroWordReturn = this.readMacroWord(word, this.preprocessNext, onlyTransformMacroArguments)
     if (readMacroWordReturn === true)
       return true
   }
 
-  if (!this.containsEsc && isKeywordPreprocessor.test(word)) type = keywords[word]
+  if (!this.containsEsc && isKeywordPreprocessor.test(word)) type = preKeywords[word]
   this.preprocessFinishToken(type, word, readMacroWordReturn, false, processMacros) // If readMacroWord returns anything except 'true' it is the real tokEndPos
 }
 
@@ -127,7 +127,7 @@ pp.readMacroWord = function(word, nextFinisher, onlyTransformArguments, forceReg
           return true
         } else {
           this.skipSpace()
-          nextFinisher(true, onlyTransformArguments, forceRegexp, true) // Stealth and Preprocess macros.
+          nextFinisher.call(this, false, true, onlyTransformArguments, forceRegexp, true) // Stealth and Preprocess macros.
         }
         return true
       }
@@ -135,7 +135,7 @@ pp.readMacroWord = function(word, nextFinisher, onlyTransformArguments, forceReg
       // We don't want to prescan spaces across macro boundary as the macro stack will fall apart
       // So we do a special prescan if we have to cross a boundary all in the name of speed
       if (this.skipSpace(true, true) === true) { // don't skip EOL and don't skip macro boundary.
-        if (preprocessPrescanFor(35, 35)) // Prescan across boundary for '##' as we crossed a boundary
+        if (this.preprocessPrescanFor(35, 35)) // Prescan across boundary for '##' as we crossed a boundary
           onlyTransformArguments = 2
       } else if (this.input.charCodeAt(this.pos) === 35 && this.input.charCodeAt(this.pos + 1) === 35) { // '##'
         onlyTransformArguments = 2
@@ -181,7 +181,7 @@ pp.readMacroWord = function(word, nextFinisher, onlyTransformArguments, forceReg
       let pos = this.pos
       // let loc
       // if (this.options.locations) loc = new line_loc_t
-      if ((this.skipSpace(true, true) === true && preprocessPrescanFor(40)) || this.input.charCodeAt(this.pos) === 40) { // '('
+      if ((this.skipSpace(true, true) === true && this.preprocessPrescanFor(40)) || this.input.charCodeAt(this.pos) === 40) { // '('
         nextIsParenL = true
       } else {
         // We didn't find a '(' so don't transform to the macro. Return the real tokEndPos so we get correct token end values.
@@ -258,7 +258,7 @@ pp.readMacroWord = function(word, nextFinisher, onlyTransformArguments, forceReg
 // Return true if the first characters after spaces are first and second
 // This is very simular to the function onlySkipSpace. Maybe the same
 // function can be used with some refactoring?
-function preprocessPrescanFor(first, second) {
+pp.preprocessPrescanFor = function(first, second) {
   let i = this.preprocessStack.length
 
   let scanInput
@@ -338,7 +338,7 @@ pp.readTokenFromMacro = function(macro, macroOffset, parameters, parameterScope,
   }
   // Now read the next token
   this.skipSpace()
-  nextFinisher.call(this, true, onlyTransformArguments, forceRegexp, true) // Stealth and Preprocess macros
+  nextFinisher.call(this, false, true, onlyTransformArguments, forceRegexp, true) // Stealth and Preprocess macros
   return true
 }
 
@@ -347,11 +347,41 @@ pp.preprocessBuiltinMacro = function(macroIdentifier) {
   return builtinMacro ? builtinMacro(this) : null
 }
 
+pp.defineMacros = function(macroArray) {
+  let parseMacroOptions = {
+    preprocess: true,
+    preprocessAddMacro: this.options.preprocessAddMacro,
+    preprocessGetMacro: this.options.preprocessGetMacro,
+    preprocessUndefineMacro: this.options.preprocessUndefineMacro,
+    preprocessIsMacro: this.options.preprocessIsMacro
+  }
+
+  for (let i = 0, size = macroArray.length; i < size; i++) {
+    let macroDefinition = macroArray[i].trim()
+    let pos = macroDefinition.indexOf("=")
+    if (pos === 0)
+      this.raise(0, "Invalid macro definition: '" + macroDefinition + "'")
+    // If there is no macro body, define the name with the value 1
+    let name, body
+    if (pos > 0) {
+      name = macroDefinition.slice(0, pos)
+      body = macroDefinition.slice(pos + 1)
+    } else {
+      name = macroDefinition
+    }
+    if (this.macrosBuiltinMacros.hasOwnProperty(name))
+      this.raise(0, "'" + name + "' is a predefined macro name")
+
+    let p = new Parser(parseMacroOptions, name + (body != null ? " " + body : ""))
+    p.preprocessParseDefine()
+  }
+}
+
 // Push macro to stack and reset tokPos etc.
 // macroString is the string from the macro. It is usually 'macro.macro' but the caller can modify it if needed
 // includeFile is true if the macro should be treated as a regular file. In other words don't stringify words after '#'
 pp.pushMacroToStack = function(macro, macroString, macroOffset, parameters, parameterScope, end, onlyTransformArguments, isIncludeFile) {
-  this.preprocessStackLastItem = {macro: macro, macroOffset: macroOffset, parameterDict: parameters, /* start: macroStart, */ end: end, lastEnd: this.localLastEnd, tokStart: this.start, onlyTransformArgumentsForLastToken: this.preprocessOnlyTransformArgumentsForLastToken, currentLine: this.curLine, currentLineStart: this.line, sourceFile: this.sourceFile}
+  this.preprocessStackLastItem = {macro: macro, macroOffset: macroOffset, parameterDict: parameters, /* start: macroStart, */ end: end, lastEnd: this.localLastEnd, tokStart: this.start, onlyTransformArgumentsForLastToken: this.preprocessOnlyTransformArgumentsForLastToken, currentLine: this.curLine, currentLineStart: this.lineStart, sourceFile: this.sourceFile}
   if (parameterScope) this.preprocessStackLastItem.parameterScope = parameterScope
   if (isIncludeFile) this.preprocessStackLastItem.isIncludeFile = isIncludeFile
   this.preprocessStackLastItem.input = this.input
@@ -362,7 +392,7 @@ pp.pushMacroToStack = function(macro, macroString, macroOffset, parameters, para
   this.pos = 0
   this.curLine = 1
   this.lineStart = 0
-  this.firstTokEnd = 0
+  this.firstEnd = 0
   this.localLastEnd = 0
   if (macro.sourceFile) this.sourceFile = macro.sourceFile
 }
@@ -370,18 +400,18 @@ pp.pushMacroToStack = function(macro, macroString, macroOffset, parameters, para
 pp.preprocessFinishTokenSkipComments = function(type, val) {
   this.preType = type
   this.preVal = val
-  this.firstTokEnd = this.preEnd = this.pos
+  this.firstEnd = this.preEnd = this.pos
   this.preprocessSkipSpace(true) // 'true' for don't skip comments
 }
 
 // Continue to the next token.
 
-pp.preprocessNext = function(stealth, onlyTransformArguments, forceRegexp, processMacros) {
+pp.preprocessNext = function(ignoreEscapeSequenceInKeyword, stealth, onlyTransformArguments, forceRegexp, processMacros) {
   if (!stealth) {
     this.preLastStart = this.preStart
     this.preLastEnd = this.preEnd
   }
-  this.localLastEnd = this.firstTokEnd
+  this.localLastEnd = this.firstEnd
   return this.preprocessReadToken(false, false, processMacros, onlyTransformArguments)
 }
 
@@ -402,7 +432,7 @@ pp.preprocessSkipSpace = function(dontSkipComments, skipEOL) {
 
 pp.preprocessEat = function(type, processMacros) {
   if (this.preType === type) {
-    this.preprocessNext(false, false, null, processMacros)
+    this.preprocessNext(false, false, false, null, processMacros)
     return true
   }
 }
@@ -411,7 +441,7 @@ pp.preprocessEat = function(type, processMacros) {
 // this.raise with errorMessage or an unexpected token error.
 
 pp.preprocessExpect = function(type, errorMessage, processMacros) {
-  if (this.preType === type) this.preprocessNext(false, undefined, null, processMacros)
+  if (this.preType === type) this.preprocessNext(false, false, undefined, null, processMacros)
   else this.raise(this.preStart, errorMessage || "Unexpected token")
 }
 
@@ -421,7 +451,7 @@ function debug() {
 pp.preprocessGetIdent = function(processMacros) {
   let ident = this.preType === tt.name ? this.preVal : ((!this.options.forbidReserved || this.preType.okAsIdent) && this.preType.keyword) || debug() // this.raise(this.preStart, "Expected Macro identifier");
   // tokRegexpAllowed = false;
-  this.preprocessNext(false, false, null, processMacros)
+  this.preprocessNext(false, false, false, null, processMacros)
   return ident
 }
 
@@ -455,7 +485,7 @@ pp.preprocessFinishToken = function(type, val, overrideTokEnd, skipEOL, processM
         let concat = "" + val1 + val2, val2TokStart = this.preStart + this.tokPosMacroOffset
         // If the macro defines anything add it to the preprocess input stack
         let concatMacro = new Macro(null, concat, null, start, false, null, false, positionOffset)
-        let r = readTokenFromMacro(concatMacro, this.tokPosMacroOffset, this.preprocessStackLastItem ? this.preprocessStackLastItem.parameterDict : null, null, this.pos, this.preprocessNext, null)
+        let r = this.readTokenFromMacro(concatMacro, this.tokPosMacroOffset, this.preprocessStackLastItem ? this.preprocessStackLastItem.parameterDict : null, null, this.pos, this.preprocessNext, null)
         // Consumed the whole macro in one bite? If not the tokenizer can't create a single token from the two concatenated tokens
         if (this.preprocessStackLastItem && this.preprocessStackLastItem.macro === concatMacro) {
           // FIXME: Should change this to 'preType' and friends

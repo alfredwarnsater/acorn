@@ -5,6 +5,7 @@ import {SourceLocation} from "./locutil.js"
 import {RegExpValidationState} from "./regexp.js"
 import {lineBreak, nextLineBreak, isNewLine, nonASCIIwhitespace} from "./whitespace.js"
 import {codePointToString} from "./util.js"
+import {Macro} from "./preprocess-macro.js"
 
 // Object type used to represent tokens. Note that normally, tokens
 // simply exist as properties on the parser object. This is only
@@ -29,20 +30,23 @@ const pp = Parser.prototype
 
 // Move to the next token
 
-pp.next = function(ignoreEscapeSequenceInKeyword) {
+pp.next = function(ignoreEscapeSequenceInKeyword, stealth) {
   if (!ignoreEscapeSequenceInKeyword && this.type.keyword && this.containsEsc)
     this.raiseRecoverable(this.start, "Escape sequence in keyword " + this.type.keyword)
   if (this.options.onToken)
     this.options.onToken(new Token(this))
 
-  this.lastTokEnd = this.end
-  this.lastTokStart = this.start
-  this.lastTokEndLoc = this.endLoc
-  this.lastTokStartLoc = this.startLoc
-  this.lastEndInput = this.input
-  this.lastEndOfFile = this.firstEndOfFile
-  this.lastTokMacroOffset = this.tokMacroOffset
-  this.nextToken()
+  if (!stealth) {
+    this.lastTokEnd = this.end
+    this.lastTokStart = this.start
+    this.lastTokEndLoc = this.endLoc
+    this.lastTokStartLoc = this.startLoc
+    this.lastEndInput = this.input
+    this.lastEndOfFile = this.firstEndOfFile
+    this.lastTokMacroOffset = this.tokMacroOffset
+  }
+  this.firstEndOfFile = null
+  this.nextToken(stealth)
 }
 
 pp.getToken = function() {
@@ -70,27 +74,31 @@ if (typeof Symbol !== "undefined")
 // Read a single token, updating the parser object's token-related
 // properties.
 
-pp.nextToken = function() {
+pp.nextToken = function(stealth) {
   let curContext = this.curContext()
   if (!curContext || !curContext.preserveSpace) this.skipSpace()
-
-  this.tokInput = this.input
-  this.tokMacroOffset = this.tokPosMacroOffset
 
   this.start = this.pos
   if (this.options.locations) this.startLoc = this.curPosition()
   if (this.pos >= this.input.length) return this.finishToken(tt.eof)
 
   if (curContext.override) return curContext.override(this)
-  else this.readToken(this.fullCharCodeAtPos())
+  else this.readToken(this.fullCharCodeAtPos(), stealth)
 }
 
-pp.readToken = function(code) {
+pp.readToken = function(code, stealth) {
+  if (!stealth) {
+    this.tokFirstStart = this.start
+  }
+  this.localLastEnd = this.firstEnd
+  this.tokInput = this.input
+  this.tokMacroOffset = this.tokPosMacroOffset
+  this.preTokParameterScope = this.preprocessParameterScope
+
   // Identifier or keyword. '\uXXXX' sequences are allowed in
   // identifiers, so '\' also dispatches to that.
   if (isIdentifierStart(code, this.options.ecmaVersion >= 6) || code === 92 /* '\' */)
     return this.readWord()
-
   return this.getTokenFromCode(code)
 }
 
@@ -132,34 +140,34 @@ pp.skipLineComment = function(startSkip) {
 // Called at the start of the parse and after every token. Skips
 // whitespace and comments, and.
 
-pp.skipSpace = function(dontSkipEOL) {
+pp.skipSpace = function(dontSkipEOL, dontSkipMacroBoundary) {
   let ch
   loop: while (true) {
     if (this.pos >= this.input.length) {
       if (this.options.preprocess) {
-        if (this.dontSkipMacroBoundary) return true;
-        if (!this.preprocessStack.length) break;
+        if (dontSkipMacroBoundary) return true
+        if (!this.preprocessStack.length) break
         // If this is the first end of file after the token save to position to allow a semicolon to be inserted
         // the end of file, if needed.
-        if (this.firstEndOfFile == null) this.firstEndOfFile = this.pos;
+        if (this.firstEndOfFile == null) this.firstEndOfFile = this.pos
         // If we are at the end of the input inside a macro continue at last position
-        var lastItem = this.preprocessStack.pop();
-        this.pos = lastItem.end;
-        this.input = lastItem.input;
-        this.curLine = lastItem.currentLine;
-        this.lineStart = lastItem.currentLineStart;
-        this.preprocessOnlyTransformArgumentsForLastToken = lastItem.onlyTransformArgumentsForLastToken;
-        this.preprocessParameterScope = lastItem.parameterScope;
-        this.tokPosMacroOffset = lastItem.macroOffset;
-        this.sourceFile = lastItem.sourceFile;
-        this.firstTokEnd = lastItem.lastEnd;
+        let lastItem = this.preprocessStack.pop()
+        this.pos = lastItem.end
+        this.input = lastItem.input
+        this.curLine = lastItem.currentLine
+        this.lineStart = lastItem.currentLineStart
+        this.preprocessOnlyTransformArgumentsForLastToken = lastItem.onlyTransformArgumentsForLastToken
+        this.preprocessParameterScope = lastItem.parameterScope
+        this.tokPosMacroOffset = lastItem.macroOffset
+        this.sourceFile = lastItem.sourceFile
+        this.firstEnd = lastItem.lastEnd
 
         // Set the last item
-        var lastIndex = this.preprocessStack.length;
-        this.preprocessStackLastItem = lastIndex ? this.preprocessStack[lastIndex - 1] : null;
-        return this.skipSpace(dontSkipEOL);
+        let lastIndex = this.preprocessStack.length
+        this.preprocessStackLastItem = lastIndex ? this.preprocessStack[lastIndex - 1] : null
+        return this.skipSpace(dontSkipEOL)
       } else {
-        break;
+        break
       }
     }
     ch = this.input.charCodeAt(this.pos)
@@ -193,15 +201,15 @@ pp.skipSpace = function(dontSkipEOL) {
       }
       break
     case 92: // '\'
-      if (!this.options.preprocess) break loop;
+      if (!this.options.preprocess) break loop
       // Check if we have an escaped newline. We are using a relaxed treatment of escaped newlines like gcc.
       // We allow spaces, horizontal and vertical tabs, and form feeds between the backslash and the subsequent newline
-      var pos = this.pos + 1
-      ch = this.input.charCodeAt(pos);
-      while (pos < this.input.length && (ch === 32 || ch === 9 || ch === 11 || ch === 12 || (ch >= 5760 && nonASCIIwhitespaceNoNewLine.test(String.fromCharCode(ch)))))
+      let pos = this.pos + 1
+      ch = this.input.charCodeAt(pos)
+      while (pos < this.input.length && (ch === 32 || ch === 9 || ch === 11 || ch === 12 || (ch >= 5760 && nonASCIIwhitespace.test(String.fromCharCode(ch)))))
         ch = this.input.charCodeAt(++pos)
       lineBreak.lastIndex = 0
-      var match = lineBreak.exec(this.input.slice(pos, pos + 2))
+      let match = lineBreak.exec(this.input.slice(pos, pos + 2))
       if (match && match.index === 0) {
         this.pos = pos + match[0].length
         if (this.options.locations) {
@@ -209,7 +217,7 @@ pp.skipSpace = function(dontSkipEOL) {
           this.lineStart = this.pos
         }
       } else {
-        break loop;
+        break loop
       }
       break loop
 
@@ -235,7 +243,6 @@ pp.finishToken = function(type, val) {
   let prevType = this.type
   this.type = type
   this.value = val
-
   this.updateContext(prevType)
 }
 
@@ -252,7 +259,7 @@ pp.readToken_dot = function(finisher) {
   let next = this.input.charCodeAt(this.pos + 1)
   if (next >= 48 && next <= 57) return this.readNumber(true, pp.finishToken)
   let next2 = this.input.charCodeAt(this.pos + 2)
-  if (this.options.ecmaVersion >= 6 && next === 46 && next2 === 46) { // 46 = dot '.'
+  if ((this.options.ecmaVersion >= 6 || this.preprocessIsParsingPreprocess) && next === 46 && next2 === 46) { // 46 = dot '.'
     this.pos += 3
     return finisher.call(this, tt.ellipsis)
   } else {
@@ -382,145 +389,179 @@ pp.readToken_numberSign = function(finisher) { // '#'
     }
     // Check if it is the first token on the line
     lineBreak.lastIndex = 0
-    let match = lineBreak.exec(this.input.slice(this.lastTokEnd, numberSignPos))
-    if (this.lastTokEnd === 0 || this.lastTokEnd === numberSignPos || match) {
+    let match = lineBreak.exec(this.input.slice(this.localLastEnd, numberSignPos))
+    if (this.lastTokEnd === 0 || this.lastTokEnd === numberSignPos || match || (!(this.preprocessStackLastItem && !this.preprocessStackLastItem.isIncludeFile) && numberSignPos === 0)) {
       switch (word) {
-        case "pragma":
-          this.preStart = this.start
-          this.preprocesSkipRestOfLine()
-          break
+      case "pragma":
+        this.preStart = this.start
+        this.preprocesSkipRestOfLine()
+        break
 
-        case "define":
-          this.preStart = this.start
-          this.preprocessParseDefine()
-          break
+      case "define":
+        this.preStart = this.start
+        this.preprocessParseDefine()
+        break
 
-        case "undef":
+      case "undef":
+        this.preprocessReadToken()
+        this.options.preprocessUndefineMacro(this.preprocessGetIdent())
+        break
+
+      case "if":
+        this.preStart = this.start
+        if (this.preNotSkipping) {
+          // We dont't allow regex when parsing preprocess expression
+          // FIXME: Here we should probably use the context functionality.
+          let saveTokRegexpAllowed = this.exprAllowed
+          this.exprAllowed = false
+          // this.tokRegexpAllowed = false;
+          this.preIfLevel.push(ptt._preIf)
+          this.preprocessReadToken(false, false, true)
+          let expr = this.preprocessParseExpression(true) // Process macros
+          let test = this.preprocessEvalExpression(expr)
+          if (!test) {
+            this.preNotSkipping = false
+            this.preprocessSkipToElseOrEndif()
+          }
+          this.exprAllowed = saveTokRegexpAllowed
+        } else {
+          return finisher.call(this, ptt._preIf)
+        }
+        break
+
+      case "ifdef":
+        this.preStart = this.start
+        if (this.preNotSkipping) {
+          this.preIfLevel.push(ptt._preIf)
           this.preprocessReadToken()
-          this.options.preprocessUndefineMacro(this.preprocessGetIdent())
-          break
+          let identifer = this.preprocessGetIdent()
+          let isMacro = this.options.preprocessIsMacro(identifer)
 
-        case "if":
-          this.preStart = this.start
+          if (!isMacro) {
+            this.preNotSkipping = false
+            this.preprocessSkipToElseOrEndif()
+          }
+        } else {
+          return finisher.call(this, ptt._preIfdef)
+        }
+        break
+
+      case "ifndef":
+        this.preStart = this.start
+        if (this.preNotSkipping) {
+          this.preIfLevel.push(ptt._preIf)
+          this.preprocessReadToken()
+          let identifer = this.preprocessGetIdent()
+          let isMacro = this.options.preprocessIsMacro(identifer)
+
+          if (isMacro) {
+            this.preNotSkipping = false
+            this.preprocessSkipToElseOrEndif()
+          }
+        } else {
+          return finisher.call(this, ptt._preIfdef)
+        }
+        break
+
+      case "elif":
+        this.preStart = this.start
+        if (this.preIfLevel.length) {
           if (this.preNotSkipping) {
+            if (this.preIfLevel[this.preIfLevel.length - 1] === ptt._preIf) {
+              this.preNotSkipping = false
+              finisher.call(this, ptt._preElseIf)
+              this.preprocessReadToken()
+              this.preprocessSkipToElseOrEndif(true) // no else
+            } else
+              this.raise(this.preStart, "#elsif after #else")
+          } else {
             // We dont't allow regex when parsing preprocess expression
-            // FIXME: Here we should probably use the context functionality.
-            let saveTokRegexpAllowed = this.exprAllowed;
+            let saveTokRegexpAllowed = this.exprAllowed
             this.exprAllowed = false
-            //this.tokRegexpAllowed = false;
-            this.preIfLevel.push(ptt._preIf);
-            this.preprocessReadToken(false, false, true);
-            let expr = this.preprocessParseExpression(true); // Process macros
-            let test = this.preprocessEvalExpression(expr);
-            if (!test) {
-              this.preNotSkipping = false;
-              this.preprocessSkipToElseOrEndif();
-            }
-            this.exprAllowed = saveTokRegexpAllowed;
-          } else {
-            return finisher.call(this, ptt._preIf);
+            this.preNotSkipping = true
+            this.preprocessReadToken(false, false, true)
+            let expr = this.preprocessParseExpression(true)
+            this.preNotSkipping = false
+            this.tokRegexpAllowed = saveTokRegexpAllowed
+            let test = this.preprocessEvalExpression(expr)
+            return finisher.call(this, test ? ptt._preElseIfTrue : ptt._preElseIfFalse)
           }
-          break;
+        } else
+          this.raise(this.preStart, "#elif without #if")
+        break
 
-        case "ifdef":
-          this.preStart = this.start
+      case "else":
+        this.preStart = this.start
+        if (this.preIfLevel.length) {
           if (this.preNotSkipping) {
-            this.preIfLevel.push(ptt._preIf)
-            this.preprocessReadToken()
-            let identifer = this.preprocessGetIdent()
-            let isMacro = this.options.preprocessIsMacro(identifer)
-
-            if (!isMacro) {
-              this.preNotSkipping = false
-              this.preprocessSkipToElseOrEndif()
-            }
-          } else {
-            return finisher.call(this, ptt._preIfdef)
-          }
-          break
-
-        case "ifndef":
-          this.preStart = this.start
-          if (this.preNotSkipping) {
-            this.preIfLevel.push(ptt._preIf)
-            this.preprocessReadToken()
-            let identifer = this.preprocessGetIdent()
-            let isMacro = this.options.preprocessIsMacro(identifer)
-
-            if (isMacro) {
-              this.preNotSkipping = false
-              this.preprocessSkipToElseOrEndif()
-            }
-          } else {
-            return finisher.call(this, ptt._preIfdef)
-          }
-          break
-
-        case "elif":
-          this.preStart = this.start
-          if (this.preIfLevel.length) {
-            if (this.preNotSkipping) {
-              if(this.preIfLevel[this.preIfLevel.length - 1] === ptt._preIf) {
-                this.preNotSkipping = false;
-                finisher.call(this, ptt._preElseIf);
-                this.preprocessReadToken();
-                this.preprocessSkipToElseOrEndif(true); // no else
-              } else
-                this.raise(this.preStart, "#elsif after #else");
-            } else {
-              // We dont't allow regex when parsing preprocess expression
-              var saveTokRegexpAllowed = tokRegexpAllowed;
-              this.exprAllowed = false;
-              this.preNotSkipping = true;
-              this.preprocessReadToken(false, false, true);
-              var expr = this.preprocessParseExpression(true);
-              this.preNotSkipping = false;
-              this.tokRegexpAllowed = saveTokRegexpAllowed;
-              var test = this.preprocessEvalExpression(expr);
-              return finisher.call(this, test ? ptt._preElseIfTrue : ptt._preElseIfFalse);
-            }
-          } else
-            this.raise(preStart, "#elif without #if");
-          break;
-
-        case "else":
-          this.preStart = this.start
-          if (this.preIfLevel.length) {
-            if (this.preNotSkipping) {
-              if (this.preIfLevel[this.preIfLevel.length - 1] === ptt._preIf) {
-                this.preIfLevel[this.preIfLevel.length - 1] = ptt._preElse
-                this.preNotSkipping = false
-                finisher.call(this, ptt._preElse)
-                this.preprocessReadToken()
-                this.preprocessSkipToElseOrEndif(true) // no else
-              } else
-                this.raise(this.preStart, "#else after #else")
-            } else {
+            if (this.preIfLevel[this.preIfLevel.length - 1] === ptt._preIf) {
               this.preIfLevel[this.preIfLevel.length - 1] = ptt._preElse
-              return finisher.call(this, ptt._preElse)
-            }
-          } else
-            this.raise(this.preStart, "#else without #if")
-          break
-
-        case "endif":
-          this.preStart = this.start
-          if (this.preIfLevel.length) {
-            if (this.preNotSkipping) {
-            this.preIfLevel.pop();
-              break;
-            }
+              this.preNotSkipping = false
+              finisher.call(this, ptt._preElse)
+              this.preprocessReadToken()
+              this.preprocessSkipToElseOrEndif(true) // no else
+            } else
+              this.raise(this.preStart, "#else after #else")
           } else {
-            this.raise(this.preStart, "#endif without #if");
+            this.preIfLevel[this.preIfLevel.length - 1] = ptt._preElse
+            return finisher.call(this, ptt._preElse)
           }
-          return finisher.call(this, ptt._preEndif);
-          break;
+        } else
+          this.raise(this.preStart, "#else without #if")
+        break
 
-        default:
-          break preprocess
+      case "endif":
+        this.preStart = this.start
+        if (this.preIfLevel.length) {
+          if (this.preNotSkipping) {
+            this.preIfLevel.pop()
+            break
+          }
+        } else {
+          this.raise(this.preStart, "#endif without #if")
+        }
+        return finisher.call(this, ptt._preEndif)
+
+      case "include":
+        if (!this.preNotSkipping) {
+          return finisher.call(this, ptt._preInclude)
+        }
+        this.preprocessReadToken()
+        let localfilepath
+        if (this.preType === tt.string)
+          localfilepath = true
+        else if (this.preType === ptt._filename)
+          localfilepath = false
+        else
+          this.raise(this.preStart, "Expected \"FILENAME\" or <FILENAME>: " + (this.preType.keyword || this.preType.type))
+
+        let theFileName = this.preVal
+        let includeDict = this.options.preprocessGetIncludeFile(this.preVal, localfilepath) || this.raise(this.preStart, "'" + theFileName + "' file not found")
+        let includeString = includeDict.include
+        let includeMacro = new Macro(null, includeString, null, 0, false, null, false, null, includeDict.sourceFile)
+        this.preprocessFinishToken(ptt._preprocess, null, null, true) // skipEOL
+        this.pushMacroToStack(includeMacro, includeMacro.macro, this.tokPosMacroOffset, null, null, this.pos, null, true) // isIncludeFile
+        this.skipSpace()
+        this.nextToken(true)
+        // this.readToken(null, null, true); // Stealth
+        return
+
+      case "error":
+        let start = this.preStart
+        this.preprocessReadToken(false, false, true)
+        this.raise(start, "Error: " + String(this.preprocessEvalExpression(this.preprocessParseExpression())))
+        break
+
+      case "warning":
+        this.preprocessReadToken(false, false, true)
+        console.log("Warning: " + String(this.preprocessEvalExpression(this.preprocessParseExpression())))
+        break
+
+      default:
+        break preprocess
       }
       this.preprocessFinishToken(this.preType, null, null, true)
-      return this.nextToken()
+      return this.next(false, true)
     } else if (isKeywordPreprocessor.test(word)) {
       this.raise(errorPos, "Preprocessor directives may only be used at the beginning of a line")
     }
@@ -622,7 +663,7 @@ pp.getTokenFromCode = function(code, finisher = this.finishToken, allowEndOfLine
   this.raise(this.pos, "Unexpected character '" + codePointToString(code) + "'")
 }
 
-pp.finishOp = function(type, size, finisher = pp.finishToken) {
+pp.finishOp = function(type, size, finisher = this.finishToken) {
   let str = this.input.slice(this.pos, this.pos + size)
   this.pos += size
   return finisher.call(this, type, str)
@@ -1021,9 +1062,9 @@ pp.readWord = function(preReadWord, onlyTransformMacroArguments, forceRegexp) {
   let word = preReadWord || this.readWord1()
   let type = tt.name
   if (this.options.preprocess) {
-    var readMacroWordReturn = this.readMacroWord(word, this.nextToken, onlyTransformMacroArguments, forceRegexp);
+    let readMacroWordReturn = this.readMacroWord(word, this.next, onlyTransformMacroArguments, forceRegexp)
     if (readMacroWordReturn === true)
-      return true;
+      return true
   }
   if (this.keywords.test(word)) {
     type = keywordTypes[word]

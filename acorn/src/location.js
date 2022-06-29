@@ -24,16 +24,18 @@ pp.curPosition = function() {
     let line = this.curLine
     let column = this.pos - this.lineStart
     if (this.preprocessStackLastItem) {
-      var macro = this.preprocessStackLastItem.macro;
-      var locationOffset = macro.locationOffset;
+      let macro = this.preprocessStackLastItem.macro
+      let locationOffset = macro.locationOffset
       if (locationOffset) {
-        var macroCurrentLine = locationOffset.line;
-        if (macroCurrentLine) line += macroCurrentLine;
-        var macroCurrentLineStart = locationOffset.column;
+        let macroCurrentLine = locationOffset.line
+        if (macroCurrentLine) line += macroCurrentLine
+        let macroCurrentLineStart = locationOffset.column
         // Only add column offset if we are on the first line
-        if (macroCurrentLineStart) column += tokPosMacroOffset - (this.curLine === 1 ? macroCurrentLineStart : 0);
+        if (macroCurrentLineStart) {
+          column += this.tokPosMacroOffset - (this.curLine === 1 ? macroCurrentLineStart : 0)
+        }
       }
     }
-    return new Position(this.curLine, this.pos - this.lineStart)
+    return new Position(line, column)
   }
 }

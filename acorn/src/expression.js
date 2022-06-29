@@ -94,7 +94,7 @@ pp.checkPropClash = function(prop, propHash, refDestructuringErrors) {
 // delayed syntax error at correct position).
 
 pp.parseExpression = function(forInit, refDestructuringErrors) {
-  let startPos = this.start, startLoc = this.startLoc
+  let startPos = this.start + this.tokMacroOffset, startLoc = this.startLoc
   let expr = this.parseMaybeAssign(forInit, refDestructuringErrors)
   if (this.type === tt.comma) {
     let node = this.startNodeAt(startPos, startLoc)
@@ -127,7 +127,7 @@ pp.parseMaybeAssign = function(forInit, refDestructuringErrors, afterLeftParse) 
     ownDestructuringErrors = true
   }
 
-  let startPos = this.start, startLoc = this.startLoc
+  let startPos = this.start + this.tokMacroOffset, startLoc = this.startLoc
   if (this.type === tt.parenL || this.type === tt.name) {
     this.potentialArrowAt = this.start
     this.potentialArrowInForAwait = forInit === "await"
@@ -164,7 +164,7 @@ pp.parseMaybeAssign = function(forInit, refDestructuringErrors, afterLeftParse) 
 // Parse a ternary conditional (`?:`) operator.
 
 pp.parseMaybeConditional = function(forInit, refDestructuringErrors) {
-  let startPos = this.start, startLoc = this.startLoc
+  let startPos = this.start + this.tokMacroOffset, startLoc = this.startLoc
   let expr = this.parseExprOps(forInit, refDestructuringErrors)
   if (this.checkExpressionErrors(refDestructuringErrors)) return expr
   if (this.eat(tt.question)) {
@@ -181,7 +181,7 @@ pp.parseMaybeConditional = function(forInit, refDestructuringErrors) {
 // Start the precedence parser.
 
 pp.parseExprOps = function(forInit, refDestructuringErrors) {
-  let startPos = this.start, startLoc = this.startLoc
+  let startPos = this.start + this.tokMacroOffset, startLoc = this.startLoc
   let expr = this.parseMaybeUnary(refDestructuringErrors, false, false, forInit)
   if (this.checkExpressionErrors(refDestructuringErrors)) return expr
   return expr.start === startPos && expr.type === "ArrowFunctionExpression" ? expr : this.parseExprOp(expr, startPos, startLoc, -1, forInit)
@@ -206,7 +206,7 @@ pp.parseExprOp = function(left, leftStartPos, leftStartLoc, minPrec, forInit) {
       }
       let op = this.value
       this.next()
-      let startPos = this.start, startLoc = this.startLoc
+      let startPos = this.start + this.tokMacroOffset, startLoc = this.startLoc
       let right = this.parseExprOp(this.parseMaybeUnary(null, false, false, forInit), startPos, startLoc, prec, forInit)
       let node = this.buildBinary(leftStartPos, leftStartLoc, left, right, op, logical || coalesce)
       if ((logical && this.type === tt.coalesce) || (coalesce && (this.type === tt.logicalOR || this.type === tt.logicalAND))) {
@@ -230,7 +230,7 @@ pp.buildBinary = function(startPos, startLoc, left, right, op, logical) {
 // Parse unary operators, both prefix and postfix.
 
 pp.parseMaybeUnary = function(refDestructuringErrors, sawUnary, incDec, forInit) {
-  let startPos = this.start, startLoc = this.startLoc, expr
+  let startPos = this.start + this.tokMacroOffset, startLoc = this.startLoc, expr
   if (this.isContextual("await") && this.canAwait) {
     expr = this.parseAwait(forInit)
     sawUnary = true
@@ -288,7 +288,7 @@ function isPrivateFieldAccess(node) {
 // Parse call, dot, and `[]`-subscript expressions.
 
 pp.parseExprSubscripts = function(refDestructuringErrors, forInit) {
-  let startPos = this.start, startLoc = this.startLoc
+  let startPos = this.start + this.tokMacroOffset, startLoc = this.startLoc
   let expr = this.parseExprAtom(refDestructuringErrors, forInit)
   if (expr.type === "ArrowFunctionExpression" && this.input.slice(this.lastTokStart, this.lastTokEnd) !== ")")
     return expr
@@ -420,7 +420,7 @@ pp.parseExprAtom = function(refDestructuringErrors, forInit) {
     return this.finishNode(node, "ThisExpression")
 
   case tt.name:
-    let startPos = this.start, startLoc = this.startLoc, containsEsc = this.containsEsc
+    let startPos = this.start + this.tokMacroOffset, startLoc = this.startLoc, containsEsc = this.containsEsc
     let id = this.parseIdent(false)
     if (this.options.ecmaVersion >= 8 && !containsEsc && id.name === "async" && !this.canInsertSemicolon() && this.eat(tt._function)) {
       this.overrideContext(tokenCtxTypes.f_expr)
@@ -572,11 +572,11 @@ pp.parseParenExpression = function() {
 }
 
 pp.parseParenAndDistinguishExpression = function(canBeArrow, forInit) {
-  let startPos = this.start, startLoc = this.startLoc, val, allowTrailingComma = this.options.ecmaVersion >= 8
+  let startPos = this.start + this.tokMacroOffset, startLoc = this.startLoc, val, allowTrailingComma = this.options.ecmaVersion >= 8
   if (this.options.ecmaVersion >= 6) {
     this.next()
 
-    let innerStartPos = this.start, innerStartLoc = this.startLoc
+    let innerStartPos = this.start + this.tokMacroOffset, innerStartLoc = this.startLoc
     let exprList = [], first = true, lastIsComma = false
     let refDestructuringErrors = new DestructuringErrors, oldYieldPos = this.yieldPos, oldAwaitPos = this.awaitPos, spreadStart
     this.yieldPos = 0
@@ -596,7 +596,7 @@ pp.parseParenAndDistinguishExpression = function(canBeArrow, forInit) {
         exprList.push(this.parseMaybeAssign(false, refDestructuringErrors, this.parseParenItem))
       }
     }
-    let innerEndPos = this.lastTokEnd, innerEndLoc = this.lastTokEndLoc
+    let innerEndPos = this.lastTokEnd + this.lastTokMacroOffset, innerEndLoc = this.lastTokEndLoc
     this.expect(tt.parenR)
 
     if (canBeArrow && !this.canInsertSemicolon() && this.eat(tt.arrow)) {
@@ -665,7 +665,7 @@ pp.parseNew = function() {
       this.raiseRecoverable(node.start, "'new.target' can only be used in functions and class static block")
     return this.finishNode(node, "MetaProperty")
   }
-  let startPos = this.start, startLoc = this.startLoc, isImport = this.type === tt._import
+  let startPos = this.start + this.tokMacroOffset, startLoc = this.startLoc, isImport = this.type === tt._import
   node.callee = this.parseSubscripts(this.parseExprAtom(), startPos, startLoc, true, false)
   if (isImport && node.callee.type === "ImportExpression") {
     this.raise(startPos, "Cannot use new with import()")
@@ -763,7 +763,7 @@ pp.parseProperty = function(isPattern, refDestructuringErrors) {
     prop.method = false
     prop.shorthand = false
     if (isPattern || refDestructuringErrors) {
-      startPos = this.start
+      startPos = this.start + this.tokMacroOffset
       startLoc = this.startLoc
     }
     if (!isPattern)
