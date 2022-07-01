@@ -6,6 +6,7 @@ import {RegExpValidationState} from "./regexp.js"
 import {lineBreak, nextLineBreak, isNewLine, nonASCIIwhitespace} from "./whitespace.js"
 import {codePointToString} from "./util.js"
 import {Macro} from "./preprocess-macro.js"
+import {PositionOffset} from "./preprocess-tokenizer.js"
 
 // Object type used to represent tokens. Note that normally, tokens
 // simply exist as properties on the parser object. This is only
@@ -250,36 +251,37 @@ pp.finishToken = function(type, val) {
 
   if (this.options.preprocess && this.preprocessPrescanFor(35, 35)) { // '##'
     this.skipSpace()
-    var val1 = val != null ? val : type.label || type.type;
-    this.pos += 2;
+    let val1 = val != null ? val : type.label || type.type
+    this.pos += 2
     if (val1 != null) {
       // Save current line and current line start. This is needed when option.locations is true
-      var positionOffset = this.options.locations && new PositionOffset(this.curLine, this.lineStart);
+      let positionOffset = this.options.locations && new PositionOffset(this.curLine, this.lineStart)
       // Save positions on first token to get start and end correct on node if cancatenated token is invalid
-      var saveTokInput = this.tokInput, saveTokEnd = this.end, saveTokStart = this.start, start = this.start + this.tokMacroOffset, variadicName = this.preprocessStackLastItem && this.preprocessStackLastItem.macro && this.preprocessStackLastItem.macro.variadicName;
-      this.skipSpace();
-      if (variadicName && variadicName === this.input.slice(this.pos, this.pos + variadicName.length)) var isVariadic = true;
-      this.preConcatenating = true;
-      this.nextToken(false, 2); // Don't transform macros
-      this.preConcatenating = false;
-      var val2 = this.value != null ? this.value : this.type.keyword || this.type.label;
+      let saveTokInput = this.tokInput, saveTokEnd = this.end, saveTokStart = this.start, start = this.start + this.tokMacroOffset, variadicName = this.preprocessStackLastItem && this.preprocessStackLastItem.macro && this.preprocessStackLastItem.macro.variadicName
+      this.skipSpace()
+      let isVariadic
+      if (variadicName && variadicName === this.input.slice(this.pos, this.pos + variadicName.length)) isVariadic = true
+      this.preConcatenating = true
+      this.nextToken(false, 2) // Don't transform macros
+      this.preConcatenating = false
+      let val2 = this.value != null ? this.value : this.type.keyword || this.type.label
       if (val2 != null) {
         // Skip token if it is a ',' concatenated with an empty variadic parameter
-        if (isVariadic && val1 === "," && val2 === "") return this.nextToken();
-        var concat = "" + val1 + val2, val2TokStart = this.start + this.tokPosMacroOffset;
+        if (isVariadic && val1 === "," && val2 === "") return this.nextToken()
+        let concat = "" + val1 + val2, val2TokStart = this.start + this.tokPosMacroOffset
         this.skipSpace()
         // If the macro defines anything add it to the preprocess input stack
-        var concatMacro = new Macro(null, concat, null, start, false, null, false, positionOffset);
-        var r = this.readTokenFromMacro(concatMacro, this.tokPosMacroOffset, this.preprocessStackLastItem ? this.preprocessStackLastItem.parameterDict : null, null, this.pos, this.next, null);
+        let concatMacro = new Macro(null, concat, null, start, false, null, false, positionOffset)
+        let r = this.readTokenFromMacro(concatMacro, this.tokPosMacroOffset, this.preprocessStackLastItem ? this.preprocessStackLastItem.parameterDict : null, null, this.pos, this.next, null)
         // Consumed the whole macro in one bite? If not the tokenizer can't create a single token from the two concatenated tokens
         if (this.preprocessStackLastItem && this.preprocessStackLastItem.macro === concatMacro && this.pos !== this.input.length) {
-          this.type = type;
-          this.start = saveTokStart;
-          this.end = saveTokEnd;
-          this.tokInput = saveTokInput;
-          this.tokPosMacroOffset = val2TokStart - val1.length; // reset the macro offset to the second token to get start and end correct on node
-          if (!isVariadic) /*raise(tokStart,*/console.log("Warning: pasting formed '" + concat + "', an invalid preprocessing token");
-        } else return r;
+          this.type = type
+          this.start = saveTokStart
+          this.end = saveTokEnd
+          this.tokInput = saveTokInput
+          this.tokPosMacroOffset = val2TokStart - val1.length // reset the macro offset to the second token to get start and end correct on node
+          if (!isVariadic) /* raise(tokStart, */console.log("Warning: pasting formed '" + concat + "', an invalid preprocessing token")
+        } else return r
       }
     }
   }
@@ -420,12 +422,12 @@ pp.readToken_numberSign = function(finisher) { // '#'
   }
 
   // Check if it is the first token on the line
-  lineBreak.lastIndex = 0;
-  var match = lineBreak.exec(this.input.slice(this.localLastEnd, this.pos));
+  lineBreak.lastIndex = 0
+  let match = lineBreak.exec(this.input.slice(this.localLastEnd, this.pos))
   if (this.lastEnd !== 0 && this.lastEnd !== this.pos && !match && ((this.preprocessStackLastItem && !this.preprocessStackLastItem.isIncludeFile) || this.pos !== 0)) {
     if (this.preprocessStackLastItem) {
       // Stringify next token
-      return this.preprocessStringify();
+      return this.preprocessStringify()
     }
   }
 
@@ -723,63 +725,64 @@ pp.getTokenFromCode = function(code, finisher = this.finishToken, allowEndOfLine
 
 // Stringify next token and return with it as a literal string.
 
- pp.preprocessStringify = function() {
-  var saveStackLength = this.preprocessStack.length, saveLastItem = this.preprocessStackLastItem;
-  this.pos++; // Skip '#'
-  this.preConcatenating = true; // To get empty sting if macro is empty
-  this.next(false, false, 2); // Don't prescan arguments
-  this.preConcatenating = false;
-  var start = this.start + this.tokMacroOffset;
-  var positionOffset = this.options.locations && new PositionOffset(this.curLine, this.lineStart);
-  var string;
+pp.preprocessStringify = function() {
+  let saveStackLength = this.preprocessStack.length, saveLastItem = this.preprocessStackLastItem
+  this.pos++ // Skip '#'
+  this.preConcatenating = true // To get empty sting if macro is empty
+  this.next(false, false, 2) // Don't prescan arguments
+  this.preConcatenating = false
+  let start = this.start + this.tokMacroOffset
+  let positionOffset = this.options.locations && new PositionOffset(this.curLine, this.lineStart)
+  let string
   if (this.type === tt.string) {
-    var quote = this.tokInput.slice(this.start, this.start + 1);
-    var escapedQuote = quote === '"' ? '\\"' : "'";
-    string = escapedQuote;
-    string += preprocessStringifyEscape(this.value);
-    string += escapedQuote;
+    let quote = this.tokInput.slice(this.start, this.start + 1)
+    let escapedQuote = quote === "\"" ? "\\\"" : "'"
+    string = escapedQuote
+    string += preprocessStringifyEscape(this.value)
+    string += escapedQuote
   } else {
-    string = this.value != null ? this.value : this.type.keyword || this.type.label;
+    string = this.value != null ? this.value : this.type.keyword || this.type.label
   }
   while (this.preprocessStack.length > saveStackLength && saveLastItem === this.preprocessStack[saveStackLength - 1] && this.pos !== this.input.length) {
-    this.preConcatenating = true; // To get empty sting if macro is empty
-    this.next(false, false, 2); // Don't prescan arguments
-    this.preConcatenating = false;
+    this.preConcatenating = true // To get empty sting if macro is empty
+    this.next(false, false, 2) // Don't prescan arguments
+    this.preConcatenating = false
     // Add a space if there is one or more withespaces
-    if (this.lastEnd !== this.start) string += " ";
+    if (this.lastEnd !== this.start) string += " "
     if (this.type === tt.string) {
-      var quote = this.tokInput.slice(this.start, this.start + 1);
-      var escapedQuote = quote === '"' ? '\\"' : "'";
-      string += escapedQuote;
-      string += preprocessStringifyEscape(this.value);
-      string += escapedQuote;
+      let quote = this.tokInput.slice(this.start, this.start + 1)
+      let escapedQuote = quote === "\"" ? "\\\"" : "'"
+      string += escapedQuote
+      string += preprocessStringifyEscape(this.value)
+      string += escapedQuote
     } else {
-      string += this.value != null ? this.value : this.type.keyword || this.type.label;
+      string += this.value != null ? this.value : this.type.keyword || this.type.label
     }
   }
-  var stringifyMacro = new Macro(null, '"' + string + '"', null, start, false, null, false, positionOffset);
-  return this.readTokenFromMacro(stringifyMacro, this.tokPosMacroOffset, null, null, this.pos, this.next);
+  let stringifyMacro = new Macro(null, "\"" + string + "\"", null, start, false, null, false, positionOffset)
+  return this.readTokenFromMacro(stringifyMacro, this.tokPosMacroOffset, null, null, this.pos, this.next)
 }
 
 // Escape characters in stringify string.
 
 function preprocessStringifyEscape(aString) {
-  for (var escaped = "", pos = 0, size = aString.length, ch = aString.charCodeAt(pos); pos < size; ch = aString.charCodeAt(++pos)) {
+  let escaped, pos, size, ch
+  for (escaped = "", pos = 0, size = aString.length, ch = aString.charCodeAt(pos); pos < size; ch = aString.charCodeAt(++pos)) {
     switch (ch) {
-      case 34: escaped += '\\\\\\"'; break; // "
-      case 10: escaped += "\\\\n"; break; // LF (\n)
-      case 13: escaped += "\\\\r"; break; // CR (\r)
-      case 9: escaped += "\\\\t"; break; // TAB (\t)
-      case 8: escaped += "\\\\b"; break; // BS (\b)
-      case 11: escaped += "\\\\v"; break; // VT (\v)
-      case 0x00A0: escaped += "\\\\u00A0"; break; // CR (\r)
-      case 0x2028: escaped += "\\\\u2028"; break; // LINE SEPARATOR
-      case 0x2029: escaped += "\\\\u2029"; break; // PARAGRAPH SEPARATOR
-      case 92: escaped += "\\\\"; break; // BACKSLASH
-      default: escaped += aString.charAt(pos); break;
+    case 34: escaped += "\\\\\\\""; break // "
+    case 10: escaped += "\\\\n"; break // LF (\n)
+    case 13: escaped += "\\\\r"; break // CR (\r)
+    case 9: escaped += "\\\\t"; break // TAB (\t)
+    case 8: escaped += "\\\\b"; break // BS (\b)
+    case 11: escaped += "\\\\v"; break // VT (\v)
+    case 0x00A0: escaped += "\\\\u00A0"; break // CR (\r)
+    case 0x2028: escaped += "\\\\u2028"; break // LINE SEPARATOR
+    case 0x2029: escaped += "\\\\u2029"; break // PARAGRAPH SEPARATOR
+    case 92: escaped += "\\\\"; break // BACKSLASH
+    default: escaped += aString.charAt(pos); break
     }
   }
-  return escaped;
+  return escaped
 }
 
 pp.finishOp = function(type, size, finisher = this.finishToken) {

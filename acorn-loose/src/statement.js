@@ -8,7 +8,7 @@ lp.parseTopLevel = function() {
   let node = this.startNodeAt(this.options.locations ? [0, getLineInfo(this.input, 0)] : 0)
   node.body = []
   while (this.tok.type !== tt.eof) node.body.push(this.parseStatement())
-  //this.next()
+  // this.next()
   this.toks.adaptDirectivePrologue(node.body)
   this.last = this.tok
   node.sourceType = this.options.sourceType
