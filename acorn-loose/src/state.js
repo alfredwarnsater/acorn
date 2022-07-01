@@ -43,11 +43,11 @@ export class LooseParser {
 
   finishNode(node, type) {
     node.type = type
-    node.end = this.last.end + this.toks.lastTokMacroOffset
+    node.end = this.last.end + (this.last.tokMacroOffset || 0)
     if (this.options.locations)
       node.loc.end = this.last.loc.end
     if (this.options.ranges)
-      node.range[1] = this.last.end + this.toks.lastTokMacroOffset
+      node.range[1] = this.last.end + (this.last.tokMacroOffset || 0)
     return node
   }
 

@@ -110,7 +110,7 @@ pp.preprocessReadWord = function(processMacros, onlyTransformMacroArguments) {
 
 // If the word is a macro return true as the token is already finished. If not just return 'undefined'.
 
-pp.readMacroWord = function(word, nextFinisher, onlyTransformArguments, forceRegexp) {
+pp.readMacroWord = function(word, nextFinisher, onlyTransformArguments) {
   let macro,
       lastStackItem = this.preprocessStackLastItem,
       oldParameterScope = this.preprocessParameterScope
@@ -127,17 +127,14 @@ pp.readMacroWord = function(word, nextFinisher, onlyTransformArguments, forceReg
           return true
         } else {
           this.skipSpace()
-          nextFinisher.call(this, false, true, onlyTransformArguments, forceRegexp, true) // Stealth and Preprocess macros.
+          nextFinisher.call(this, false, true, onlyTransformArguments, true) // Stealth and Preprocess macros.
         }
         return true
       }
       // Lets look ahead to find out if we find a '##' for token concatenate
       // We don't want to prescan spaces across macro boundary as the macro stack will fall apart
       // So we do a special prescan if we have to cross a boundary all in the name of speed
-      if (this.skipSpace(true, true) === true) { // don't skip EOL and don't skip macro boundary.
-        if (this.preprocessPrescanFor(35, 35)) // Prescan across boundary for '##' as we crossed a boundary
-          onlyTransformArguments = 2
-      } else if (this.input.charCodeAt(this.pos) === 35 && this.input.charCodeAt(this.pos + 1) === 35) { // '##'
+      if (this.preprocessPrescanFor(35, 35)) { // Prescan across boundary for '##' as we crossed a boundary
         onlyTransformArguments = 2
       }
       this.preprocessParameterScope = macro && macro.parameterScope
@@ -181,7 +178,7 @@ pp.readMacroWord = function(word, nextFinisher, onlyTransformArguments, forceReg
       let pos = this.pos
       // let loc
       // if (this.options.locations) loc = new line_loc_t
-      if ((this.skipSpace(true, true) === true && this.preprocessPrescanFor(40)) || this.input.charCodeAt(this.pos) === 40) { // '('
+      if (this.preprocessPrescanFor(40)) { // '('
         nextIsParenL = true
       } else {
         // We didn't find a '(' so don't transform to the macro. Return the real tokEndPos so we get correct token end values.
@@ -239,8 +236,11 @@ pp.readMacroWord = function(word, nextFinisher, onlyTransformArguments, forceReg
             code = this.input.charCodeAt(this.pos++)
           }
           let val = this.input.slice(paramStart, this.pos - 1)
+          let trimmedLeft = val.trimStart()
+          let trimmedVal = trimmedLeft.trimEnd()
+          let trimOffset = val.length - trimmedLeft.length
           // var val = preTokType === _preprocessParamItem ? preTokVal : "";
-          parameters[ident] = new Macro(ident, val, null, paramStart + this.tokMacroOffset, true, this.preTokParameterScope || this.preprocessStackLastItem, false, positionOffset) // true = 'Is argument', false = 'Not varadic'
+          parameters[ident] = new Macro(ident, trimmedVal, null, paramStart + this.tokMacroOffset + trimOffset, true, this.preTokParameterScope || this.preprocessStackLastItem, false, positionOffset) // true = 'Is argument', false = 'Not varadic'
         }
         if (code !== 41) this.raise(this.pos, "Expected ')' after macro prarameters")
         this.skipSpace(true, true) // Don't skip EOL and don't skip macro boundary
@@ -248,7 +248,7 @@ pp.readMacroWord = function(word, nextFinisher, onlyTransformArguments, forceReg
         // preprocessExpect(_parenR);
       }
       // If the macro defines anything add it to the preprocess input stack
-      return this.readTokenFromMacro(macro, this.tokPosMacroOffset, parameters, oldParameterScope, this.pos, nextFinisher, onlyTransformArguments, forceRegexp)
+      return this.readTokenFromMacro(macro, this.tokPosMacroOffset, parameters, oldParameterScope, this.pos, nextFinisher, onlyTransformArguments)
     }
   }
 }
@@ -261,16 +261,11 @@ pp.readMacroWord = function(word, nextFinisher, onlyTransformArguments, forceReg
 pp.preprocessPrescanFor = function(first, second) {
   let i = this.preprocessStack.length
 
-  let scanInput
-  let scanPos
+  let scanInput = this.input
+  let scanPos = this.pos
   stackloop:
-  while (i-- > 0) {
-    let stackItem = this.preprocessStack[i]
-    let scanInputLen = stackItem.inputLen
-    scanPos = stackItem.end
-    scanInput = stackItem.input
-
-    for (;;) {
+  while (scanInput != null) {
+    charloop: for (;;) {
       let ch = scanInput.charCodeAt(scanPos)
       if (ch === 32) { // ' '
         ++scanPos
@@ -292,21 +287,21 @@ pp.preprocessPrescanFor = function(first, second) {
           scanPos = end + 2
         } else if (next === 47) { // '/'
           ch = scanInput.charCodeAt(scanPos += 2)
-          while (scanPos < this.input.length && ch !== 10 && ch !== 13 && ch !== 8232 && ch !== 8233) {
+          while (scanPos < scanInput.length && ch !== 10 && ch !== 13 && ch !== 8232 && ch !== 8233) {
             ++scanPos
             ch = scanInput.charCodeAt(scanPos)
           }
         } else break stackloop
       } else if (ch === 160 || ch === 11 || ch === 12 || (ch >= 5760 && nonASCIIwhitespace.test(String.fromCharCode(ch)))) { // '\xa0', VT, FF, Unicode whitespaces
         ++scanPos
-      } else if (scanPos >= scanInputLen) {
-        continue stackloop
+      } else if (scanPos >= scanInput.length) {
+        break charloop
       } else if (ch === 92) { // '\'
         // Check if we have an escaped newline. We are using a relaxed treatment of escaped newlines like gcc.
         // We allow spaces, horizontal and vertical tabs, and form feeds between the backslash and the subsequent newline
         let pos = scanPos + 1
         ch = scanInput.charCodeAt(pos)
-        while (pos < scanInputLen && (ch === 32 || ch === 9 || ch === 11 || ch === 12 || (ch >= 5760 && nonASCIIwhitespace.test(String.fromCharCode(ch))))) // nonASCIIwhitespaceNoNewLine before
+        while (pos < scanInput.length && (ch === 32 || ch === 9 || ch === 11 || ch === 12 || (ch >= 5760 && nonASCIIwhitespace.test(String.fromCharCode(ch))))) // nonASCIIwhitespaceNoNewLine before
           ch = scanInput.charCodeAt(++pos)
         lineBreak.lastIndex = 0
         let match = lineBreak.exec(scanInput.slice(pos, pos + 2))
@@ -319,13 +314,17 @@ pp.preprocessPrescanFor = function(first, second) {
         break stackloop
       }
     }
+    let stackItem = this.preprocessStack[--i]
+    if (stackItem == null) return false // End of all input. We will not find `first` and `second`.
+    scanPos = stackItem.end
+    scanInput = stackItem.input
   }
   return scanInput && scanInput.charCodeAt(scanPos) === first && (second == null || scanInput.charCodeAt(scanPos + 1) === second)
 }
 
 // Push macro to stack and start read from it.
 // Just read next token if the macro is empty
-pp.readTokenFromMacro = function(macro, macroOffset, parameters, parameterScope, end, nextFinisher, onlyTransformArguments, forceRegexp) {
+pp.readTokenFromMacro = function(macro, macroOffset, parameters, parameterScope, end, nextFinisher, onlyTransformArguments) {
   let macroString = macro.macro
   // If we are evaluation a macro expresion an empty macro definition means true or '1'
   if (!macroString && nextFinisher === this.preprocessNext) macroString = "1"
@@ -333,12 +332,12 @@ pp.readTokenFromMacro = function(macro, macroOffset, parameters, parameterScope,
     this.pushMacroToStack(macro, macroString, macroOffset, parameters, parameterScope, end, onlyTransformArguments)
   } else if (this.preConcatenating) {
     // If we are concatenating or stringifying and the macro is empty just make an empty string.
-    (nextFinisher === this.next ? this.finishToken : this.preprocessFinishToken)(tt.name, "")
+    (nextFinisher === this.next ? this.finishToken : this.preprocessFinishToken).call(this, tt.name, "")
     return true
   }
   // Now read the next token
   this.skipSpace()
-  nextFinisher.call(this, false, true, onlyTransformArguments, forceRegexp, true) // Stealth and Preprocess macros
+  nextFinisher.call(this, false, true, onlyTransformArguments, true) // Stealth and Preprocess macros
   return true
 }
 
@@ -406,7 +405,7 @@ pp.preprocessFinishTokenSkipComments = function(type, val) {
 
 // Continue to the next token.
 
-pp.preprocessNext = function(ignoreEscapeSequenceInKeyword, stealth, onlyTransformArguments, forceRegexp, processMacros) {
+pp.preprocessNext = function(ignoreEscapeSequenceInKeyword, stealth, onlyTransformArguments, processMacros) {
   if (!stealth) {
     this.preLastStart = this.preStart
     this.preLastEnd = this.preEnd
@@ -432,7 +431,7 @@ pp.preprocessSkipSpace = function(dontSkipComments, skipEOL) {
 
 pp.preprocessEat = function(type, processMacros) {
   if (this.preType === type) {
-    this.preprocessNext(false, false, false, null, processMacros)
+    this.preprocessNext(false, false, false, processMacros)
     return true
   }
 }
@@ -451,7 +450,7 @@ function debug() {
 pp.preprocessGetIdent = function(processMacros) {
   let ident = this.preType === tt.name ? this.preVal : ((!this.options.forbidReserved || this.preType.okAsIdent) && this.preType.keyword) || debug() // this.raise(this.preStart, "Expected Macro identifier");
   // tokRegexpAllowed = false;
-  this.preprocessNext(false, false, false, null, processMacros)
+  this.preprocessNext(false, false, false, processMacros)
   return ident
 }
 

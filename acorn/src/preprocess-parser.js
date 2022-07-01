@@ -116,7 +116,7 @@ pp.preprocessParseExprOp = function(left, minPrec, processMacros) {
       let node = this.startNodeFrom(left)
       node.left = left
       node.operator = this.preVal
-      this.preprocessNext(false, false, false, null, processMacros)
+      this.preprocessNext(false, false, false, processMacros)
       node.right = this.preprocessParseExprOp(this.preprocessParseMaybeUnary(processMacros), prec, processMacros)
       node = this.preprocessFinishNode(node, /&&|\|\|/.test(node.operator) ? "LogicalExpression" : "BinaryExpression")
       return this.preprocessParseExprOp(node, minPrec, processMacros)
@@ -132,7 +132,7 @@ pp.preprocessParseMaybeUnary = function(processMacros) {
     let node = this.startNode()
     node.operator = this.preVal
     node.prefix = true
-    this.preprocessNext(false, false, false, null, processMacros)
+    this.preprocessNext(false, false, false, processMacros)
     node.argument = this.preprocessParseMaybeUnary(processMacros)
     return this.preprocessFinishNode(node, "UnaryExpression")
   }
@@ -153,7 +153,7 @@ pp.preprocessParseExprAtom = function(processMacros) {
 
   case tt.parenL:
     let tokStart1 = this.preStart
-    this.preprocessNext(false, false, false, null, processMacros)
+    this.preprocessNext(false, false, false, processMacros)
     let val = this.preprocessParseExpression(processMacros)
     val.start = tokStart1
     val.end = this.preEnd
@@ -162,7 +162,7 @@ pp.preprocessParseExprAtom = function(processMacros) {
 
   case ptt._preDefined:
     let node = this.startNode()
-    this.preprocessNext(false, false, false, null, processMacros)
+    this.preprocessNext(false, false, false, processMacros)
     node.object = this.preprocessParseDefinedExpression(processMacros)
     return this.preprocessFinishNode(node, "DefinedExpression")
 
@@ -190,7 +190,7 @@ pp.preprocessParseDefinedExpression = function(processMacros) {
 
   case tt.parenL:
     let tokStart1 = this.preStart
-    this.preprocessNext(false, false, false, null, processMacros)
+    this.preprocessNext(false, false, false, processMacros)
     let val = this.preprocessParseDefinedExpression(processMacros)
     val.start = tokStart1
     val.end = this.preEnd
@@ -206,7 +206,7 @@ pp.preprocessParseStringNumLiteral = function(processMacros) {
   let node = this.startNode()
   node.value = this.preVal
   node.raw = this.preInput.slice(this.preStart, this.preEnd)
-  this.preprocessNext(false, false, false, null, processMacros)
+  this.preprocessNext(false, false, false, processMacros)
   return this.preprocessFinishNode(node, "Literal")
 }
 
