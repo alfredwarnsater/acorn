@@ -71,7 +71,7 @@ pp.inGeneratorContext = function() {
 
 pp.updateContext = function(prevType) {
   let update, type = this.type
-  if (type.keyword && prevType === tt.dot)
+  if (this.type.keyword && prevType === tt.dot)
     this.exprAllowed = false
   else if (update = type.updateContext)
     update.call(this, prevType)

@@ -1,4 +1,4 @@
-import {types as tt} from "./tokentype.js"
+import {types as tt, objjAtTypes as oatt} from "./tokentype.js"
 import {Parser} from "./state.js"
 import {lineBreak, skipWhiteSpace} from "./whitespace.js"
 import {isIdentifierStart, isIdentifierChar, keywordRelationalOperator} from "./identifier.js"
@@ -85,6 +85,32 @@ pp.parseStatement = function(context, topLevel, exports) {
   if (this.isLet(context)) {
     starttype = tt._var
     kind = "let"
+  }
+
+  // Objective-J
+  if (this.options.objj) {
+    switch (starttype) {
+      case oatt._implementation: return this.parseObjjImplementation(node)
+      case oatt._interface: return this.parseObjjInterface(node)
+      case oatt._protocol:
+        // If next token is a left parenthesis it is a ProtocolLiteral expression so bail out
+        if (this.input.charCodeAt(this.pos) !== 40) {
+          return this.parseObjjProtocol(node)
+        } else {
+          break
+        }
+      case oatt._import: return this.parseObjjImport(node)
+      case oatt._preprocess: return this.parseObjjPreprocess(node)
+      case oatt._class: return this.parseObjjClass(node)
+      case oatt._global: return this.parseObjjGlobal(node)
+      case oatt._typedef: return this.parseObjjTypedef(node)
+      default:
+        if (this.isAsyncFunction()) {
+          next(); // "async"
+          next(); // _function
+          return parseFunction(node, true, true);
+        }
+    }
   }
 
   // Most types of statements are recognized by the keyword they
@@ -269,7 +295,7 @@ pp.parseIfStatement = function(node) {
 }
 
 pp.parseReturnStatement = function(node) {
-  if (!this.inFunction && !this.options.allowReturnOutsideFunction)
+  if (!this.inFunction && !this.options.allowReturnOutsideFunction && !this.objjInFunction)
     this.raise(this.start, "'return' outside of function")
   this.next()
 

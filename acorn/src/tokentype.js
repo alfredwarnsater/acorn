@@ -180,9 +180,62 @@ export const preTypes = {
   _preWarning: pkw("warning"),
   _preprocessParamItem: new TokenType("preprocessParamItem", {type: "preprocessParamItem"}), // FIXME: type is not used anymore
   _preprocessSkipLine: new TokenType("skipLine", {type: "skipLine"}), // FIXME: type is not used anymore
-  _preInclude: pkw("include"),
-
-  _filename: pkw("filename")
+  _preInclude: pkw("include")
 }
 
 export const isKeywordPreprocessor = wordsRegexp(Object.keys(preKeywords).join(" "))
+
+export const objjKeywords = {}
+
+function okw(name, options = {}) {
+  options.keyword = name
+  return objjKeywords[name] = new TokenType(name, options)
+}
+
+export const objjTypes = {
+  // Map Objective-J keyword names to token types.
+  _filename: new TokenType("filename"),
+  _action: okw("IBAction"),
+  _outlet: okw("IBOutlet"),
+  _unsigned: okw("unsigned"),
+  _signed: okw("signed"),
+  _byte: okw("byte"),
+  _char: okw("char"),
+  _short: okw("short"),
+  _int: okw("int"),
+  _long: okw("long"),
+  _id: okw("id"),
+  _float: okw("float"),
+  _boolean: okw("BOOL"),
+  _SEL: okw("SEL"),
+  _double: okw("double")
+}
+
+export const objjAtKeywords = {}
+
+function oakw(name, options = {}) {
+  options.keyword = name
+  return objjAtKeywords[name] = new TokenType(name, options)
+}
+
+export const objjAtTypes = {
+  // Map Objective-J "@" keyword names to token types.
+  _implementation: oakw("implementation"),
+  _outlet: oakw("outlet"),
+  _accessors: oakw("accessors"),
+  _end: oakw("end"),
+  _import: oakw("import"),
+  _action: oakw("action"),
+  _selector: oakw("selector"),
+  _class: oakw("class"),
+  _global: oakw("global"),
+  _ref: oakw("ref"),
+  _deref: oakw("deref"),
+  _protocol: oakw("protocol"),
+  _optional: oakw("optional"),
+  _required: oakw("required"),
+  _interface: oakw("interface"),
+  _typedef: oakw("typedef"),
+  _dictionaryLiteral: okw("{"),
+  _arrayLiteral: okw("[")
+}

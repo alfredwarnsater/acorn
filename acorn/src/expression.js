@@ -16,7 +16,7 @@
 //
 // [opp]: http://en.wikipedia.org/wiki/Operator-precedence_parser
 
-import {types as tt} from "./tokentype.js"
+import {types as tt, objjAtTypes as oatt} from "./tokentype.js"
 import {types as tokenCtxTypes} from "./tokencontext.js"
 import {Parser} from "./state.js"
 import {DestructuringErrors} from "./parseutil.js"
@@ -93,10 +93,10 @@ pp.checkPropClash = function(prop, propHash, refDestructuringErrors) {
 // and object pattern might appear (so it's possible to raise
 // delayed syntax error at correct position).
 
-pp.parseExpression = function(forInit, refDestructuringErrors) {
+pp.parseExpression = function(forInit, refDestructuringErrors, noComma, noIn) {
   let startPos = this.start + this.tokMacroOffset, startLoc = this.startLoc
   let expr = this.parseMaybeAssign(forInit, refDestructuringErrors)
-  if (this.type === tt.comma) {
+  if (!noComma && this.type === tt.comma) {
     let node = this.startNodeAt(startPos, startLoc)
     node.expressions = [expr]
     while (this.eat(tt.comma)) node.expressions.push(this.parseMaybeAssign(forInit, refDestructuringErrors))
@@ -468,7 +468,22 @@ pp.parseExprAtom = function(refDestructuringErrors, forInit) {
   case tt.bracketL:
     node = this.startNode()
     this.next()
-    node.elements = this.parseExprList(tt.bracketR, true, true, refDestructuringErrors)
+    var firstExpr = null
+    if (this.type === tt.ellipsis) {
+      firstExpr = this.parseSpread(refDestructuringErrors)
+    } else if (this.type !== tt.comma && this.type !== tt.bracketR) {
+      if (this.type === tt._super) {
+        firstExpr = this.finishNode(this.startNode(), "Identifier")
+        firstExpr.name = "super"
+        this.next()
+      } else {
+        firstExpr = this.parseExpression(null, null, true, true);
+      }
+
+      if (this.type !== tt.comma && this.type !== tt.bracketR)
+        return this.parseObjjMessageSendExpression(node, firstExpr);
+    }
+    node.elements = this.parseExprList(tt.bracketR, true, true, refDestructuringErrors, firstExpr)
     return this.finishNode(node, "ArrayExpression")
 
   case tt.braceL:
@@ -495,6 +510,39 @@ pp.parseExprAtom = function(refDestructuringErrors, forInit) {
     } else {
       return this.unexpected()
     }
+
+  case oatt._selector:
+    node = this.startNode();
+    this.next();
+    this.expect(tt.parenL, "Expected '(' after '@selector'");
+    this.parseObjjSelector(node, tt.parenR);
+    this.expect(tt.parenR, "Expected closing ')' after selector");
+    return this.finishNode(node, "SelectorLiteralExpression");
+
+  case oatt._ref:
+    node = this.startNode();
+    this.next();
+    this.expect(tt.parenL, "Expected '(' after '@ref'");
+    node.element = this.parseIdent(node, tt.parenR);
+    this.expect(tt.parenR, "Expected closing ')' after ref");
+    return this.finishNode(node, "Reference");
+
+  case oatt._deref:
+    node = this.startNode();
+    this.next();
+    this.expect(tt.parenL, "Expected '(' after '@deref'");
+    node.expr = this.parseExpression(null, null, true, true);
+    this.expect(tt.parenR, "Expected closing ')' after deref");
+    return this.finishNode(node, "Dereference");
+
+  case oatt._dictionaryLiteral:
+    node = this.startNode();
+    this.next();
+
+    var r = this.parseObjjDictionary();
+    node.keys = r[0];
+    node.values = r[1];
+    return this.finishNode(node, "DictionaryLiteral");
 
   default:
     this.unexpected()
@@ -963,16 +1011,18 @@ pp.checkParams = function(node, allowDuplicates) {
 // nothing in between them to be parsed as `null` (which is needed
 // for array literals).
 
-pp.parseExprList = function(close, allowTrailingComma, allowEmpty, refDestructuringErrors) {
+pp.parseExprList = function(close, allowTrailingComma, allowEmpty, refDestructuringErrors, firstExpr) {
   let elts = [], first = true
+  if (firstExpr && this.eat(close)) return [firstExpr];
   while (!this.eat(close)) {
     if (!first) {
       this.expect(tt.comma)
       if (allowTrailingComma && this.afterTrailingComma(close)) break
-    } else first = false
-
+    }
     let elt
-    if (allowEmpty && this.type === tt.comma)
+    if (first && firstExpr) {
+      elt = firstExpr
+    } else if (allowEmpty && this.type === tt.comma)
       elt = null
     else if (this.type === tt.ellipsis) {
       elt = this.parseSpread(refDestructuringErrors)
@@ -981,6 +1031,7 @@ pp.parseExprList = function(close, allowTrailingComma, allowEmpty, refDestructur
     } else {
       elt = this.parseMaybeAssign(false, refDestructuringErrors)
     }
+    if (first) first = false
     elts.push(elt)
   }
   return elts

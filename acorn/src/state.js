@@ -118,6 +118,17 @@ export class Parser {
 
     this.preInput = null
 
+    // This is the parser's state. `inFunction` is used to reject
+    // `return` statements outside of functions, `labels` to verify that
+    // `break` and `continue` have somewhere to jump to, `functionIsAsync`
+    // to know if await is a identifier or a keyword and `strict`
+    // indicates whether strict mode is on.
+
+    this.objjInFunction = null
+    this.objjLabels = null
+    this.objjFunctionIsAsync = null
+    this.objjStrict = null
+
     // The start and end offsets of the current token.
     // First tokstart is the same as tokStart except when the preprocessor finds a macro.
     // Then the tokFirstStart points to the start of the token that will be replaced by the macro.

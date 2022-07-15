@@ -1,5 +1,5 @@
 import {isIdentifierStart, isIdentifierChar} from "./identifier.js"
-import {types as tt, keywords as keywordTypes, preTypes as ptt, isKeywordPreprocessor} from "./tokentype.js"
+import {types as tt, preTypes as ptt, isKeywordPreprocessor, objjTypes as ott, objjAtTypes as oatt, keywords, objjKeywords, objjAtKeywords} from "./tokentype.js"
 import {Parser} from "./state.js"
 import {SourceLocation} from "./locutil.js"
 import {RegExpValidationState} from "./regexp.js"
@@ -368,6 +368,15 @@ pp.readToken_plus_min = function(code, finisher) { // '+-'
 }
 
 pp.readToken_lt_gt = function(code, finisher) { // '<>'
+  if (code === 60 && (this.type === oatt._import || this.preType === this._preInclude) && this.options.objj) {  // '<'
+    for (var start = this.pos + 1;;) {
+      var ch = this.input.charCodeAt(++this.pos);
+      if (ch === 62)  // '>'
+        return finisher.call(this, ott._filename, this.input.slice(start, this.pos++));
+      if (this.pos >= this.input.length || ch === 13 || ch === 10 || ch === 8232 || ch === 8233)
+        this.raise(this.start, "Unterminated import statement");
+    }
+  }
   let next = this.input.charCodeAt(this.pos + 1)
   let size = 1
   if (next === code) {
@@ -637,6 +646,22 @@ pp.readToken_numberSign = function(finisher) { // '#'
   this.raise(errorPos, "Unexpected character '" + codePointToString(code) + "'")
 }
 
+pp.readToken_at = function(code, finisher) { // '@'
+  var next = this.input.charCodeAt(++this.pos);
+  if (next === 34 || next === 39) { // Read string if "'" or '"'
+    let tmp = this.readString(next, finisher);
+    return tmp}
+  if (next === 123) // Read dictionary literal if "{"
+    return finisher.call(this, oatt._dictionaryLiteral);
+  if (next === 91) // Read array literal if "["
+    return finisher.call(this, oatt._arrayLiteral);
+
+  var word = this.readWord1(),
+      token = objjAtKeywords[word];
+  if (!token) this.raise(this.tokStart, "Unrecognized Objective-J keyword '@" + word + "'");
+  return finisher.call(this, token);
+}
+
 pp.getTokenFromCode = function(code, finisher = this.finishToken, allowEndOfLineToken) {
   switch (code) {
   // The interpretation of a dot depends on whether it is followed
@@ -710,6 +735,11 @@ pp.getTokenFromCode = function(code, finisher = this.finishToken, allowEndOfLine
 
   case 35: // '#'
     return this.readToken_numberSign(finisher)
+
+  case 64: // '@'
+    if (this.options.objj)
+      return this.readToken_at(code, finisher);
+    return false;
   }
   if (allowEndOfLineToken) {
     if (code === 13 || code === 10 || code === 8232 || code === 8233) {
@@ -1189,7 +1219,9 @@ pp.readWord = function(preReadWord, onlyTransformMacroArguments) {
       return true
   }
   if (this.keywords.test(word)) {
-    type = keywordTypes[word]
+    type = keywords[word]
+  } else if (this.options.objj && objjKeywords.hasOwnProperty(word)) {
+    type = objjKeywords[word]
   }
-  return this.finishToken(type, word)
+return this.finishToken(type, word)
 }

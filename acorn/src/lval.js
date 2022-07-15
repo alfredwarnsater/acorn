@@ -20,6 +20,7 @@ pp.toAssignable = function(node, isBinding, refDestructuringErrors) {
     case "ArrayPattern":
     case "AssignmentPattern":
     case "RestElement":
+    case "Dereference":
       break
 
     case "ObjectExpression":
@@ -249,6 +250,7 @@ pp.checkLValSimple = function(expr, bindingType = BIND_NONE, checkClashes) {
   const isBind = bindingType !== BIND_NONE
 
   switch (expr.type) {
+  case "Dereference":
   case "Identifier":
     if (this.strict && this.reservedWordsStrictBind.test(expr.name))
       this.raiseRecoverable(expr.start, (isBind ? "Binding " : "Assigning to ") + expr.name + " in strict mode")
