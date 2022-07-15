@@ -471,6 +471,8 @@ pp.parseExprAtom = function(refDestructuringErrors, forInit) {
     var firstExpr = null
     if (this.type === tt.ellipsis) {
       firstExpr = this.parseSpread(refDestructuringErrors)
+      if (refDestructuringErrors && this.type === tt.comma && refDestructuringErrors.trailingComma < 0)
+        refDestructuringErrors.trailingComma = this.start
     } else if (this.type !== tt.comma && this.type !== tt.bracketR) {
       if (this.type === tt._super) {
         firstExpr = this.finishNode(this.startNode(), "Identifier")
