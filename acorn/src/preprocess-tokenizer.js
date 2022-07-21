@@ -369,7 +369,7 @@ pp.defineMacros = function(macroArray) {
     } else {
       name = macroDefinition
     }
-    if (this.macrosBuiltinMacros.hasOwnProperty(name))
+    if (Object.prototype.hasOwnProperty.call(this.macrosBuiltinMacros, name))
       this.raise(0, "'" + name + "' is a predefined macro name")
 
     let p = new Parser(parseMacroOptions, name + (body != null ? " " + body : ""))
@@ -495,7 +495,7 @@ pp.preprocessFinishToken = function(type, val, overrideTokEnd, skipEOL, processM
           this.preEnd = saveTokEnd
           this.input = saveTokInput
           this.tokPosMacroOffset = val2TokStart - val1.length // reset the macro offset to the second token to get start and end correct on node
-          if (!isVariadic) /* this.raise(tokStart, */console.log("Warning: pasting formed '" + concat + "', an invalid preprocessing token")
+          if (!isVariadic) /* this.raise(tokStart, */console.warn("Warning: pasting formed '" + concat + "', an invalid preprocessing token")
         } else return r
       }
     }

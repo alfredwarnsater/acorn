@@ -334,8 +334,10 @@ pp.parseSubscript = function(base, startPos, startLoc, noCalls, maybeAsyncArrow,
   let optional = optionalSupported && this.eat(tt.questionDot)
   if (noCalls && optional) this.raise(this.lastTokStart, "Optional chaining cannot appear in the callee of new expressions")
   let messageSendNode, canInsertSemi
-  if (this.options.objj) messageSendNode = this.startNode(), canInsertSemi = this.canInsertSemicolon()
-
+  if (this.options.objj) {
+    messageSendNode = this.startNode()
+    canInsertSemi = this.canInsertSemicolon()
+  }
   let computed = this.eat(tt.bracketL)
   if (computed || (optional && this.type !== tt.parenL && this.type !== tt.backQuote) || this.eat(tt.dot)) {
     let node = this.startNodeAt(startPos, startLoc)
@@ -481,7 +483,7 @@ pp.parseExprAtom = function(refDestructuringErrors, forInit) {
   case tt.bracketL:
     node = this.startNode()
     this.next()
-    var firstExpr = null
+    let firstExpr = null
     if (this.type === tt.ellipsis) {
       firstExpr = this.parseSpread(refDestructuringErrors)
       if (refDestructuringErrors && this.type === tt.comma && refDestructuringErrors.trailingComma < 0)
@@ -554,7 +556,7 @@ pp.parseExprAtom = function(refDestructuringErrors, forInit) {
     node = this.startNode()
     this.next()
 
-    var r = this.parseObjjDictionary()
+    let r = this.parseObjjDictionary()
     node.keys = r[0]
     node.values = r[1]
     return this.finishNode(node, "DictionaryLiteral")
@@ -1049,7 +1051,7 @@ pp.checkParams = function(node, allowDuplicates) {
 
 pp.parseExprList = function(close, allowTrailingComma, allowEmpty, refDestructuringErrors, firstExpr) {
   let elts = [], first = true
-  if (firstExpr && this.eat(close)) return [firstExpr];
+  if (firstExpr && this.eat(close)) return [firstExpr]
   while (!this.eat(close)) {
     if (!first) {
       this.expect(tt.comma)

@@ -280,7 +280,7 @@ pp.finishToken = function(type, val) {
           this.end = saveTokEnd
           this.tokInput = saveTokInput
           this.tokPosMacroOffset = val2TokStart - val1.length // reset the macro offset to the second token to get start and end correct on node
-          if (!isVariadic) /* raise(tokStart, */console.log("Warning: pasting formed '" + concat + "', an invalid preprocessing token")
+          if (!isVariadic) /* raise(tokStart, */console.warn("Warning: pasting formed '" + concat + "', an invalid preprocessing token")
         } else return r
       }
     }
@@ -623,7 +623,7 @@ pp.readToken_numberSign = function(finisher) { // '#'
 
       case "warning":
         this.preprocessReadToken(false, false, true)
-        console.log("Warning: " + String(this.preprocessEvalExpression(this.preprocessParseExpression())))
+        console.warn("Warning: " + String(this.preprocessEvalExpression(this.preprocessParseExpression())))
         break
 
       default:
@@ -647,19 +647,20 @@ pp.readToken_numberSign = function(finisher) { // '#'
 }
 
 pp.readToken_at = function(code, finisher) { // '@'
-  var next = this.input.charCodeAt(++this.pos);
+  let next = this.input.charCodeAt(++this.pos)
   if (next === 34 || next === 39) { // Read string if "'" or '"'
-    let tmp = this.readString(next, finisher);
-    return tmp}
+    let tmp = this.readString(next, finisher)
+    return tmp
+  }
   if (next === 123) // Read dictionary literal if "{"
-    return finisher.call(this, oatt._dictionaryLiteral);
+    return finisher.call(this, oatt._dictionaryLiteral)
   if (next === 91) // Read array literal if "["
-    return finisher.call(this, oatt._arrayLiteral);
+    return finisher.call(this, oatt._arrayLiteral)
 
-  var word = this.readWord1(),
-      token = objjAtKeywords[word];
-  if (!token) this.raise(this.tokStart, "Unrecognized Objective-J keyword '@" + word + "'");
-  return finisher.call(this, token);
+  let word = this.readWord1(),
+      token = objjAtKeywords[word]
+  if (!token) this.raise(this.tokStart, "Unrecognized Objective-J keyword '@" + word + "'")
+  return finisher.call(this, token)
 }
 
 pp.getTokenFromCode = function(code, finisher = this.finishToken, allowEndOfLineToken) {
@@ -1225,8 +1226,8 @@ pp.readWord = function(preReadWord, onlyTransformMacroArguments) {
   }
   if (this.keywords.test(word)) {
     type = keywords[word]
-  } else if (this.options.objj && objjKeywords.hasOwnProperty(word)) {
+  } else if (this.options.objj && Object.prototype.hasOwnProperty.call(objjKeywords, word)) {
     type = objjKeywords[word]
   }
-return this.finishToken(type, word)
+  return this.finishToken(type, word)
 }
