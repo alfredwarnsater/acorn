@@ -16,7 +16,7 @@
 //
 // [opp]: http://en.wikipedia.org/wiki/Operator-precedence_parser
 
-import {types as tt, objjAtTypes as oatt} from "./tokentype.js"
+import {types as tt, objjTypes as ott, objjAtTypes as oatt} from "./tokentype.js"
 import {types as tokenCtxTypes} from "./tokencontext.js"
 import {Parser} from "./state.js"
 import {DestructuringErrors} from "./parseutil.js"
@@ -205,7 +205,12 @@ pp.parseExprOp = function(left, leftStartPos, leftStartLoc, minPrec, forInit) {
         prec = tt.logicalAND.binop
       }
       let op = this.value
+      let isIn = (this.type === tt._in)
       this.next()
+      if (isIn && this.type === tt.colon) { // TODO: How to deal with [a in:b] in a better way for objj?
+        this.inIsIdentifier = true
+        return left
+      }
       let startPos = this.start + this.tokMacroOffset, startLoc = this.startLoc
       let right = this.parseExprOp(this.parseMaybeUnary(null, false, false, forInit), startPos, startLoc, prec, forInit)
       let node = this.buildBinary(leftStartPos, leftStartLoc, left, right, op, logical || coalesce)
@@ -328,6 +333,8 @@ pp.parseSubscript = function(base, startPos, startLoc, noCalls, maybeAsyncArrow,
   let optionalSupported = this.options.ecmaVersion >= 11
   let optional = optionalSupported && this.eat(tt.questionDot)
   if (noCalls && optional) this.raise(this.lastTokStart, "Optional chaining cannot appear in the callee of new expressions")
+  let messageSendNode, canInsertSemi
+  if (this.options.objj) messageSendNode = this.startNode(), canInsertSemi = this.canInsertSemicolon()
 
   let computed = this.eat(tt.bracketL)
   if (computed || (optional && this.type !== tt.parenL && this.type !== tt.backQuote) || this.eat(tt.dot)) {
@@ -335,6 +342,12 @@ pp.parseSubscript = function(base, startPos, startLoc, noCalls, maybeAsyncArrow,
     node.object = base
     if (computed) {
       node.property = this.parseExpression()
+      if (this.options.objj && this.type !== tt.bracketR) {
+        messageSendNode.object = node.property
+        messageSendNode.canInsertSemicolonBefore = canInsertSemi
+        this.nodeMessageSendObjectExpression = messageSendNode
+        return base
+      }
       this.expect(tt.bracketR)
     } else if (this.type === tt.privateId && base.type !== "Super") {
       node.property = this.parsePrivateIdent()
@@ -419,7 +432,7 @@ pp.parseExprAtom = function(refDestructuringErrors, forInit) {
     this.next()
     return this.finishNode(node, "ThisExpression")
 
-  case tt.name:
+  case tt.name: case ott._id: case ott._char: case ott._long: case ott._short: // If we have an Objective-J token at this point it should be an identifier. TODO: This is an ugly fix.
     let startPos = this.start + this.tokMacroOffset, startLoc = this.startLoc, containsEsc = this.containsEsc
     let id = this.parseIdent(false)
     if (this.options.ecmaVersion >= 8 && !containsEsc && id.name === "async" && !this.canInsertSemicolon() && this.eat(tt._function)) {
@@ -479,11 +492,11 @@ pp.parseExprAtom = function(refDestructuringErrors, forInit) {
         firstExpr.name = "super"
         this.next()
       } else {
-        firstExpr = this.parseExpression(null, null, true, true);
+        firstExpr = this.parseExpression(false, refDestructuringErrors, true, true)
       }
 
       if (this.type !== tt.comma && this.type !== tt.bracketR)
-        return this.parseObjjMessageSendExpression(node, firstExpr);
+        return this.parseObjjMessageSendExpression(node, firstExpr)
     }
     node.elements = this.parseExprList(tt.bracketR, true, true, refDestructuringErrors, firstExpr)
     return this.finishNode(node, "ArrayExpression")
@@ -514,37 +527,58 @@ pp.parseExprAtom = function(refDestructuringErrors, forInit) {
     }
 
   case oatt._selector:
-    node = this.startNode();
-    this.next();
-    this.expect(tt.parenL, "Expected '(' after '@selector'");
-    this.parseObjjSelector(node, tt.parenR);
-    this.expect(tt.parenR, "Expected closing ')' after selector");
-    return this.finishNode(node, "SelectorLiteralExpression");
+    node = this.startNode()
+    this.next()
+    this.expect(tt.parenL, "Expected '(' after '@selector'")
+    this.parseObjjSelector(node, tt.parenR)
+    this.expect(tt.parenR, "Expected closing ')' after selector")
+    return this.finishNode(node, "SelectorLiteralExpression")
 
   case oatt._ref:
-    node = this.startNode();
-    this.next();
-    this.expect(tt.parenL, "Expected '(' after '@ref'");
-    node.element = this.parseIdent(node, tt.parenR);
-    this.expect(tt.parenR, "Expected closing ')' after ref");
-    return this.finishNode(node, "Reference");
+    node = this.startNode()
+    this.next()
+    this.expect(tt.parenL, "Expected '(' after '@ref'")
+    node.element = this.parseIdent(node, tt.parenR)
+    this.expect(tt.parenR, "Expected closing ')' after ref")
+    return this.finishNode(node, "Reference")
 
   case oatt._deref:
-    node = this.startNode();
-    this.next();
-    this.expect(tt.parenL, "Expected '(' after '@deref'");
-    node.expr = this.parseExpression(null, null, true, true);
-    this.expect(tt.parenR, "Expected closing ')' after deref");
-    return this.finishNode(node, "Dereference");
+    node = this.startNode()
+    this.next()
+    this.expect(tt.parenL, "Expected '(' after '@deref'")
+    node.expr = this.parseExpression(true, refDestructuringErrors, true, true)
+    this.expect(tt.parenR, "Expected closing ')' after deref")
+    return this.finishNode(node, "Dereference")
 
   case oatt._dictionaryLiteral:
-    node = this.startNode();
-    this.next();
+    node = this.startNode()
+    this.next()
 
-    var r = this.parseObjjDictionary();
-    node.keys = r[0];
-    node.values = r[1];
-    return this.finishNode(node, "DictionaryLiteral");
+    var r = this.parseObjjDictionary()
+    node.keys = r[0]
+    node.values = r[1]
+    return this.finishNode(node, "DictionaryLiteral")
+
+  case oatt._arrayLiteral:
+    node = this.startNode()
+    firstExpr = null
+
+    this.next()
+    this.expect(tt.bracketL, "Expected '[' at beginning of array literal")
+
+    if (this.type !== tt.bracketR)
+      firstExpr = this.parseExpression(true, refDestructuringErrors, true, true)
+
+    node.elements = this.parseExprList(tt.bracketR, true, true, refDestructuringErrors, firstExpr)
+    return this.finishNode(node, "ArrayLiteral")
+
+  case oatt._protocol:
+    node = this.startNode()
+    this.next()
+    this.expect(tt.parenL, "Expected '(' after '@protocol'")
+    node.id = this.parseIdent(true)
+    this.expect(tt.parenR, "Expected closing ')' after protocol name")
+    return this.finishNode(node, "ProtocolLiteralExpression")
 
   default:
     this.unexpected()
@@ -1056,6 +1090,7 @@ pp.checkUnreserved = function({start, end, name}) {
   if (re.test(name)) {
     if (!this.inAsync && name === "await")
       this.raiseRecoverable(start, "Cannot use keyword 'await' outside an async function")
+    if (this.options.objj && name === "super") return
     this.raiseRecoverable(start, `The keyword '${name}' is reserved`)
   }
 }

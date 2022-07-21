@@ -44,7 +44,7 @@ pp.preprocessParseDefine = function() {
 
   this.preprocessDontConcatenate = false
   let macroString = this.preInput.slice(start, this.preStart)
-  macroString = macroString.replace(/\\/g, " ")
+  macroString = macroString.replace(/\\\n/g, " \n") // TODO: This probably breaks the ability to have stuff after \ in multiline macros. Could probably write more advanced regexp to fix this.
   // If variadic get the last parameter for the variadic parameter name
   this.options.preprocessAddMacro(new Macro(macroIdentifier, macroString, parameters, start, false, null, variadic && parameters[parameters.length - 1], positionOffset))
   this.preprocessIsParsingPreprocess = false

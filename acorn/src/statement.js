@@ -82,6 +82,14 @@ pp.isAsyncFunction = function() {
 pp.parseStatement = function(context, topLevel, exports) {
   let starttype = this.type, node = this.startNode(), kind
 
+  // This is a special case when trying figure out if this is a subscript to the former line or a new send message statement on this line...
+  if (this.nodeMessageSendObjectExpression) {
+    node.expression = this.parseObjjMessageSendExpression(this.nodeMessageSendObjectExpression, this.nodeMessageSendObjectExpression.object)
+    this.nodeMessageSendObjectExpression = null
+    this.semicolon()
+    return this.finishNode(node, "ExpressionStatement")
+  }
+
   if (this.isLet(context)) {
     starttype = tt._var
     kind = "let"
@@ -90,26 +98,20 @@ pp.parseStatement = function(context, topLevel, exports) {
   // Objective-J
   if (this.options.objj) {
     switch (starttype) {
-      case oatt._implementation: return this.parseObjjImplementation(node)
-      case oatt._interface: return this.parseObjjInterface(node)
-      case oatt._protocol:
-        // If next token is a left parenthesis it is a ProtocolLiteral expression so bail out
-        if (this.input.charCodeAt(this.pos) !== 40) {
-          return this.parseObjjProtocol(node)
-        } else {
-          break
-        }
-      case oatt._import: return this.parseObjjImport(node)
-      case oatt._preprocess: return this.parseObjjPreprocess(node)
-      case oatt._class: return this.parseObjjClass(node)
-      case oatt._global: return this.parseObjjGlobal(node)
-      case oatt._typedef: return this.parseObjjTypedef(node)
-      default:
-        if (this.isAsyncFunction()) {
-          next(); // "async"
-          next(); // _function
-          return parseFunction(node, true, true);
-        }
+    case oatt._implementation: return this.parseObjjImplementation(node)
+    case oatt._interface: return this.parseObjjInterface(node)
+    case oatt._protocol:
+      // If next token is a left parenthesis it is a ProtocolLiteral expression so bail out
+      if (this.input.charCodeAt(this.pos) !== 40) {
+        return this.parseObjjProtocol(node)
+      } else {
+        break
+      }
+    case oatt._import: return this.parseObjjImport(node)
+    case oatt._preprocess: return this.parseObjjPreprocess(node)
+    case oatt._class: return this.parseObjjClass(node)
+    case oatt._global: return this.parseObjjGlobal(node)
+    case oatt._typedef: return this.parseObjjTypedef(node)
     }
   }
 

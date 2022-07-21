@@ -123,7 +123,7 @@ pp.parseObjjMethodDeclaration = function(node) {
   // If we find a '(' we have a return type to parse
   if (this.eat(tt.parenL)) {
     var typeNode = this.startNode();
-    if (this.eat(ott._action)) {
+    if (this.eat(oatt._action) || this.eat(ott._action)) { // TODO: Something is not right here, are there two types of action tokens?
       node.action = this.finishNode(typeNode, "ObjectiveJActionType");
       typeNode = this.startNode();
     }
@@ -185,7 +185,7 @@ pp.parseObjjStringNumRegExpLiteral = function() {
 
 pp.parseObjjIvarDeclaration = function(node) {
   var outlet;
-  if (this.eat(tt._outlet))
+  if (this.eat(oatt._outlet))
     outlet = true;
   var type = this.parseObjectiveJType();
   if (this.strict && this.isStrictBadIdWord(type.name))
@@ -268,58 +268,56 @@ pp.parseObjjClassElement = function() {
 // 'int' can be followed by an optinal 'long'. 'long' can be followed by an optional extra 'long'
 
 pp.parseObjectiveJType = function(startFrom, canBeAsync) {
-  var node = startFrom ? this.startNodeFrom(startFrom) : this.startNode(), allowProtocol = false;
-  if (canBeAsync && this.options.ecmaVersion >= 8 && eatContextual("async")) {
-    node.async = true;
+  let node = startFrom ? this.startNodeFrom(startFrom) : this.startNode(), allowProtocol = false
+  if (canBeAsync && this.options.ecmaVersion >= 8 && this.eatContextual("async")) {
+    node.async = true
   }
   if (this.type === tt.name) {
     // It should be a class name
-    node.name = this.value;
-    node.typeisclass = true;
-    allowProtocol = true;
-    this.next();
+    node.name = this.value
+    node.typeisclass = true
+    allowProtocol = true
+    this.next()
   } else {
-    node.typeisclass = false;
-    node.name = this.type.keyword;
+    node.typeisclass = false
+    node.name = this.type.keyword
     // Do nothing more if it is 'void'
     if (!this.eat(tt._void)) {
       if (this.eat(ott._id)) {
-        allowProtocol = true;
+        allowProtocol = true
       } else {
         // Now check if it is some basic type or an approved combination of basic types
-        var nextKeyWord;
-        if (this.eat(ott._float) || this.eat(ott._boolean) || this.eat(ott._SEL) || this.eat(ott._double))
-        {
-          nextKeyWord = this.type.keyword;
-        }
-        else {
+        let nextKeyWord
+        if (this.eat(ott._float) || this.eat(ott._boolean) || this.eat(ott._SEL) || this.eat(ott._double)) {
+          nextKeyWord = this.type.keyword
+        } else {
           if (this.eat(ott._signed) || this.eat(ott._unsigned))
-            nextKeyWord = this.type.keyword || true;
+            nextKeyWord = this.type.keyword || true
           if (this.eat(ott._char) || this.eat(ott._byte) || this.eat(ott._short)) {
             if (nextKeyWord)
-              node.name += " " + nextKeyWord;
-            nextKeyWord = tokType.keyword || true;
+              node.name += " " + nextKeyWord
+            nextKeyWord = this.type.keyword || true
           } else {
             if (this.eat(ott._int)) {
               if (nextKeyWord)
-                node.name += " " + nextKeyWord;
-              nextKeyWord = this.type.keyword || true;
+                node.name += " " + nextKeyWord
+              nextKeyWord = this.type.keyword || true
             }
             if (this.eat(ott._long)) {
               if (nextKeyWord)
-                node.name += " " + nextKeyWord;
-              nextKeyWord = tokType.keyword || true;
+                node.name += " " + nextKeyWord
+              nextKeyWord = this.type.keyword || true
               if (this.eat(ott._long)) {
-                node.name += " " + nextKeyWord;
+                node.name += " " + nextKeyWord
               }
             }
           }
           if (!nextKeyWord) {
             // It must be a class name if it was not a basic type. // FIXME: This is not true
-            node.name = (!this.options.forbidReserved && this.type.label) || this.unexpected();
-            node.typeisclass = true;
-            allowProtocol = true;
-            this.next();
+            node.name = (!this.options.forbidReserved && this.type.label) || this.unexpected()
+            node.typeisclass = true
+            allowProtocol = true
+            this.next()
           }
         }
       }
@@ -327,118 +325,125 @@ pp.parseObjectiveJType = function(startFrom, canBeAsync) {
   }
   if (allowProtocol) {
     // Is it 'id' or classname followed by a '<' then parse protocols.
-    if (this.value === '<') {
-      var first = true,
-          protocols = [];
-      node.protocols = protocols;
+    if (this.value === "<") {
+      let first = true,
+          protocols = []
+      node.protocols = protocols
       do {
-        next();
+        this.next()
         if (first)
-          first = false;
+          first = false
         else
-          eat(_comma);
-        protocols.push(parseIdent(true));
-      } while (tokVal !== '>');
-      next();
+          this.eat(tt.comma)
+        protocols.push(this.parseIdent(true))
+      } while (this.value !== ">")
+      this.next()
     }
   }
-  return this.finishNode(node, "ObjectiveJType");
+  return this.finishNode(node, "ObjectiveJType")
 }
 
-
 pp.parseObjjPreprocess = function(node) {
-  this.next();
-  return this.finishNode(node, "PreprocessStatement");
+  this.next()
+  return this.finishNode(node, "PreprocessStatement")
 }
 
 pp.parseObjjClass = function(node) {
-  this.next();
-  node.id = this.parseIdent(false);
-  return this.finishNode(node, "ClassStatement");
+  this.next()
+  node.id = this.parseIdent(false)
+  return this.finishNode(node, "ClassStatement")
 }
 
 pp.parseObjjGlobal = function(node) {
-  this.next();
-  node.id = this.parseIdent(false);
-  return this.finishNode(node, "GlobalStatement");
+  this.next()
+  node.id = this.parseIdent(false)
+  return this.finishNode(node, "GlobalStatement")
 }
 
 pp.parseObjjTypedef = function(node) {
-  this.next();
-  node.typedefname = this.parseIdent(true);
-  return this.finishNode(node, "TypeDefStatement");
+  this.next()
+  node.typedefname = this.parseIdent(true)
+  return this.finishNode(node, "TypeDefStatement")
 }
 
-var skipWhiteSpace = /(?:\s|\/\/.*|\/\*[^]*?\*\/)*/g
+let skipWhiteSpace = /(?:\s|\/\/.*|\/\*[^]*?\*\/)*/g
 
 // Parses a comma-separated list of <key>:<value> pairs and returns them as
 // [arrayOfKeyExpressions, arrayOfValueExpressions].
 pp.parseObjjDictionary = function() {
-  this.expect(tt.braceL, "Expected '{' before dictionary");
+  this.expect(tt.braceL, "Expected '{' before dictionary")
 
-  var keys = [], values = [], first = true;
+  let keys = [], values = [], first = true
   while (!this.eat(tt.braceR)) {
     if (!first) {
-      this.expect(tt.comma, "Expected ',' between expressions");
-      if (/* this.options.allowTrailingCommas && */ this.eat(tt.braceR)) break;
+      this.expect(tt.comma, "Expected ',' between expressions")
+      if (/* this.options.allowTrailingCommas && */ this.eat(tt.braceR)) break
     }
 
-    keys.push(this.parseExpression(null, null, true, true));
-    this.expect(tt.colon, "Expected ':' between dictionary key and value");
-    values.push(this.parseExpression(null, null, true, true));
-    first = false;
+    keys.push(this.parseExpression(true, null, true, true))
+    this.expect(tt.colon, "Expected ':' between dictionary key and value")
+    values.push(this.parseExpression(true, null, true, true))
+    first = false
   }
-  return [keys, values];
+  return [keys, values]
 }
 
 pp.parseObjjSelector = function(node, close) {
-  var first = true,
-      selectors = [];
+  let first = true,
+      selectors = []
   for (;;) {
     if (this.type !== tt.colon) {
-      selectors.push(this.parseIdent(true).name);
-      if (first && this.type === close) break;
+      selectors.push(this.parseIdent(true).name)
+      if (first && this.type === close) break
     }
-    this.expect(tt.colon, "Expected ':' in selector");
-    selectors.push(":");
-    if (this.type === close) break;
-    first = false;
+    this.expect(tt.colon, "Expected ':' in selector")
+    selectors.push(":")
+    if (this.type === close) break
+    first = false
   }
-  node.selector = selectors.join("");
+  node.selector = selectors.join("")
 }
 
 pp.parseObjjMessageSendExpression = function(node, firstExpr) {
-  this.parseObjjSelectorWithArguments(node, tt.bracketR);
+  this.parseObjjSelectorWithArguments(node, tt.bracketR)
   if (firstExpr.type === "Identifier" && firstExpr.name === "super")
-    node.superObject = true;
+    node.superObject = true
   else
-    node.object = firstExpr;
-  return this.finishNode(node, "MessageSendExpression");
+    node.object = firstExpr
+  return this.finishNode(node, "MessageSendExpression")
 }
 
 pp.parseObjjSelectorWithArguments = function(node, close) {
-  var first = true,
+  let first = true,
       selectors = [],
       args = [],
-      parameters = [];
-  node.selectors = selectors;
-  node.arguments = args;
+      parameters = []
+  node.selectors = selectors
+  node.arguments = args
   for (;;) {
-    if (this.type !== tt.colon) {
-      selectors.push(this.parseIdent(true));
+    // Special case if 'in' is an identifier. TODO: Ugly fix.
+    if (this.type !== tt.colon || (this.inIsIdentifier && this.type === tt.colon)) {
+      if (this.inIsIdentifier) {
+        let inNode = this.finishNode(this.startNode(), "Identifier")
+        inNode.name = "in"
+        selectors.push(inNode)
+        this.inIsIdentifier = false
+      } else {
+        selectors.push(this.parseIdent(true))
+      }
       if (first && this.eat(close))
         break;
     } else {
       selectors.push(null);
     }
     this.expect(tt.colon, "Expected ':' in selector");
-    args.push(this.parseExpression(null, null, true, true));
+    args.push(this.parseExpression(true, null, true, true))
     if (this.eat(close))
       break;
     if (this.type === tt.comma) {
       node.parameters = [];
       while(this.eat(tt.comma)) {
-        node.parameters.push(this.parseExpression(null, null, true, true ));
+        node.parameters.push(this.parseExpression(true, null, true, true))
       }
       this.eat(close);
       break;

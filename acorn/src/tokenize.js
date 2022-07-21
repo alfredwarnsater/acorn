@@ -47,6 +47,7 @@ pp.next = function(ignoreEscapeSequenceInKeyword, stealth, onlyTransformArgument
     this.lastTokMacroOffset = this.tokMacroOffset
   }
   this.firstEndOfFile = null
+  this.nodeMessageSendObjectExpression = null
   this.nextToken(stealth, onlyTransformArguments)
 }
 
@@ -223,8 +224,7 @@ pp.skipSpace = function(dontSkipEOL, dontSkipMacroBoundary) {
       } else {
         break loop
       }
-      break loop
-
+      break
     default:
       if (ch > 8 && ch < 14 || ch >= 5760 && nonASCIIwhitespace.test(String.fromCharCode(ch))) {
         ++this.pos
@@ -300,7 +300,7 @@ pp.readToken_dot = function(finisher) {
   let next = this.input.charCodeAt(this.pos + 1)
   if (next >= 48 && next <= 57) return this.readNumber(true, pp.finishToken)
   let next2 = this.input.charCodeAt(this.pos + 2)
-  if ((this.options.ecmaVersion >= 6 || this.preprocessIsParsingPreprocess) && next === 46 && next2 === 46) { // 46 = dot '.'
+  if ((this.options.ecmaVersion >= 6 || this.preprocessIsParsingPreprocess || this.options.objj) && next === 46 && next2 === 46) { // 46 = dot '.'
     this.pos += 3
     return finisher.call(this, tt.ellipsis)
   } else {
@@ -368,13 +368,13 @@ pp.readToken_plus_min = function(code, finisher) { // '+-'
 }
 
 pp.readToken_lt_gt = function(code, finisher) { // '<>'
-  if (code === 60 && (this.type === oatt._import || this.preType === this._preInclude) && this.options.objj) {  // '<'
-    for (var start = this.pos + 1;;) {
-      var ch = this.input.charCodeAt(++this.pos);
-      if (ch === 62)  // '>'
-        return finisher.call(this, ott._filename, this.input.slice(start, this.pos++));
+  if (code === 60 && (this.type === oatt._import || this.preType === ptt._preInclude) && this.options.objj) { // '<'
+    for (let start = this.pos + 1;;) {
+      let ch = this.input.charCodeAt(++this.pos)
+      if (ch === 62) // '>'
+        return finisher.call(this, ott._filename, this.input.slice(start, this.pos++))
       if (this.pos >= this.input.length || ch === 13 || ch === 10 || ch === 8232 || ch === 8233)
-        this.raise(this.start, "Unterminated import statement");
+        this.raise(this.start, "Unterminated import statement")
     }
   }
   let next = this.input.charCodeAt(this.pos + 1)
@@ -736,10 +736,15 @@ pp.getTokenFromCode = function(code, finisher = this.finishToken, allowEndOfLine
   case 35: // '#'
     return this.readToken_numberSign(finisher)
 
+  case 92: // '\'
+    if (this.options.preprocess) {
+      return this.finishOp(ptt._preBackslash, 1, finisher)
+    }
+
   case 64: // '@'
     if (this.options.objj)
-      return this.readToken_at(code, finisher);
-    return false;
+      return this.readToken_at(code, finisher)
+    return false
   }
   if (allowEndOfLineToken) {
     if (code === 13 || code === 10 || code === 8232 || code === 8233) {

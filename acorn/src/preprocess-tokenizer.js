@@ -349,6 +349,7 @@ pp.preprocessBuiltinMacro = function(macroIdentifier) {
 pp.defineMacros = function(macroArray) {
   let parseMacroOptions = {
     preprocess: true,
+    ecmaVersion: this.options.ecmaVersion,
     preprocessAddMacro: this.options.preprocessAddMacro,
     preprocessGetMacro: this.options.preprocessGetMacro,
     preprocessUndefineMacro: this.options.preprocessUndefineMacro,
@@ -449,6 +450,7 @@ function debug() {
 }
 pp.preprocessGetIdent = function(processMacros) {
   let ident = this.preType === tt.name ? this.preVal : ((!this.options.forbidReserved || this.preType.okAsIdent) && this.preType.keyword) || debug() // this.raise(this.preStart, "Expected Macro identifier");
+  this.exprAllowed = false
   // tokRegexpAllowed = false;
   this.preprocessNext(false, false, false, processMacros)
   return ident

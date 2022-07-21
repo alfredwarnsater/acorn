@@ -44,7 +44,7 @@ pp.startNodeFrom = function(other) {
     delete other.spacesBefore
   }
   if (this.options.locations) {
-    node.loc = new SourceLocation()
+    node.loc = new SourceLocation(this, node.start, node.end)
     node.loc.start = other.loc.start
   }
   if (this.options.ranges)

@@ -129,6 +129,8 @@ export class Parser {
     this.objjFunctionIsAsync = null
     this.objjStrict = null
 
+    this.nodeMessageSendObjectExpression = null
+
     // The start and end offsets of the current token.
     // First tokstart is the same as tokStart except when the preprocessor finds a macro.
     // Then the tokFirstStart points to the start of the token that will be replaced by the macro.

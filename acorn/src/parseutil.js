@@ -70,7 +70,8 @@ pp.expectContextual = function(name) {
 pp.canInsertSemicolon = function() {
   return this.type === tt.eof ||
     this.type === tt.braceR ||
-    lineBreak.test(this.lastEndInput.slice(this.lastTokEnd, this.lastEndOfFile || this.tokFirstStart)) || this.lastEndOfFile != null
+    lineBreak.test(this.lastEndInput.slice(this.lastTokEnd, this.lastEndOfFile || this.tokFirstStart)) || this.lastEndOfFile != null ||
+    (this.nodeMessageSendObjectExpression && this.nodeMessageSendObjectExpression.canInsertSemicolonBefore && this.options.objj)
 }
 
 pp.insertSemicolon = function() {
@@ -85,7 +86,7 @@ pp.insertSemicolon = function() {
 // pretend that there is a semicolon at this position.
 
 pp.semicolon = function() {
-  if (!this.eat(tt.semi) && !this.insertSemicolon()) this.unexpected()
+  if (!this.eat(tt.semi) && !this.insertSemicolon()) this.nodeMessageSendObjectExpression ? this.raise((this.options.objj && this.nodeMessageSendObjectExpression.start) || this.start, "Expected a semicolon") : this.unexpected()
 }
 
 pp.afterTrailingComma = function(tokType, notNext) {
