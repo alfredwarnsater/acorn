@@ -5,7 +5,7 @@ export default {
   input: "acorn-loose/src/index.js",
   output: [
     {
-      file: "acorn-loose/dist/acorn-loose.js",
+      sourcemap: true,
       format: "umd",
       name: "acorn.loose",
       globals: {acorn: "acorn"}

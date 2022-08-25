@@ -1,4 +1,8 @@
 (function() {
+  require('source-map-support').install({
+    environment: 'node'
+  });
+
   var driver = require("./driver.js")
   require("./tests.js");
   require("./tests-harmony.js");

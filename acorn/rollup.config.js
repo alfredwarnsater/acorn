@@ -5,7 +5,7 @@ export default [
     input: "acorn/src/index.js",
     output: [
       {
-        file: "acorn/dist/acorn.js",
+        sourcemap: true,
         format: "umd",
         name: "acorn"
       },
