@@ -43,6 +43,6 @@
     "prepare": "cd ..; npm run build:main"
   },
   "bin": {
-    "acorn": "./bin/objj-parser"
+    "objj-parser": "./bin/objj-parser"
   }
 }

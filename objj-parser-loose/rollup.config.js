@@ -1,19 +1,20 @@
 import buble from "@rollup/plugin-buble"
 
 export default {
-  external: ["acorn"],
-  input: "acorn-loose/src/index.js",
+  external: ["objj-parser"],
+  input: "objj-parser-loose/src/index.js",
   output: [
     {
-      sourcemap: true,
+      file: "objj-parser-loose/dist/objj-parser-loose.js",
       format: "umd",
-      name: "acorn.loose",
-      globals: {acorn: "acorn"}
+      name: "objjParser.loose",
+      globals: {objjParser: "objj-parser"},
+      sourcemap: true
     },
     {
-      file: "acorn-loose/dist/acorn-loose.mjs",
+      file: "objj-parser-loose/dist/objj-parser-loose.mjs",
       format: "es",
-      globals: {acorn: "acorn"}
+      globals: {objjParser: "objj-parser"}
     }
   ],
   plugins: [

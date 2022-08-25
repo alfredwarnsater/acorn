@@ -2,15 +2,16 @@ import buble from "@rollup/plugin-buble"
 
 export default [
   {
-    input: "acorn/src/index.js",
+    input: "objj-parser/src/index.js",
     output: [
       {
-        sourcemap: true,
+        file: "objj-parser/dist/objj-parser.js",
         format: "umd",
-        name: "acorn"
+        name: "objjParser",
+        sourcemap: true
       },
       {
-        file: "acorn/dist/acorn.mjs",
+        file: "objj-parser/dist/objj-parser.mjs",
         format: "es"
       }
     ],
@@ -19,12 +20,12 @@ export default [
     ]
   },
   {
-    external: ["acorn", "fs", "path"],
-    input: "acorn/src/bin/acorn.js",
+    external: ["objj-parser", "fs", "path"],
+    input: "objj-parser/src/bin/objj-parser.js",
     output: {
-      file: "acorn/dist/bin.js",
+      file: "objj-parser/dist/bin.js",
       format: "cjs",
-      paths: {acorn: "./acorn.js"}
+      paths: {objjParser: "./objj-parser.js"}
     },
     plugins: [
       buble({transforms: {dangerousForOf: true}})

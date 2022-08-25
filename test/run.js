@@ -32,7 +32,8 @@
   require("./tests-module-string-names.js");
   require("./tests-preprocess.js");
   require("./tests-objj.js");
-  var acorn_loose = require("../acorn-loose")
+  var acorn = require("../objj-parser");
+  var acorn_loose = require("../objj-parser-loose");
 
   var htmlLog = typeof document === "object" && document.getElementById('log');
   var htmlGroup = htmlLog;
