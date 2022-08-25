@@ -1,5 +1,6 @@
 import {Parser} from "./state.js"
 import {types as tt, objjAtTypes as oatt, objjTypes as ott} from "./tokentype.js"
+import {functionFlags} from "./scopeflags.js"
 
 const pp = Parser.prototype
 
@@ -253,7 +254,9 @@ pp.parseObjjClassElement = function() {
     let oldInFunc = this.objjInFunction, oldLabels = this.objjLabels, oldAsync = this.objjFunctionIsAsync
     this.objjInFunction = true; this.objjLabels = []
     this.objjFunctionIsAsync = !!element.returntype && !!element.returntype.async
+    this.enterScope(functionFlags(this.objjFunctionIsAsync, false))
     element.body = this.parseBlock(true)
+    this.exitScope()
     this.objjInFunction = oldInFunc; this.objjLabels = oldLabels; this.objjFunctionIsAsync = oldAsync
     return this.finishNode(element, "MethodDeclarationStatement")
   } else
