@@ -1,7 +1,7 @@
 (function (global, factory) {
   typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports, require('objj-parser')) :
   typeof define === 'function' && define.amd ? define(['exports', 'objj-parser'], factory) :
-  (global = typeof globalThis !== 'undefined' ? globalThis : global || self, factory((global["objj-parser"] = global["objj-parser"] || {}, global["objj-parser"].loose = {}), global.objjParser));
+  (global = typeof globalThis !== 'undefined' ? globalThis : global || self, factory((global.objjParser = global.objjParser || {}, global.objjParser.loose = {}), global["objj-parser"]));
 })(this, (function (exports, objjParser) { 'use strict';
 
   var dummyValue = "✖";
@@ -268,6 +268,7 @@
 
   lp$2.resetTo = function(pos) {
     this.toks.pos = pos;
+    this.toks.containsEsc = false;
     var ch = this.input.charAt(pos - 1);
     this.toks.exprAllowed = !ch || /[[{(,;:?/*=+\-~!|&%^<>]/.test(ch) ||
       /[enwfd]/.test(ch) &&

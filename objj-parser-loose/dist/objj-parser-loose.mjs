@@ -264,6 +264,7 @@ lp$2.readToken = function() {
 
 lp$2.resetTo = function(pos) {
   this.toks.pos = pos;
+  this.toks.containsEsc = false;
   var ch = this.input.charAt(pos - 1);
   this.toks.exprAllowed = !ch || /[[{(,;:?/*=+\-~!|&%^<>]/.test(ch) ||
     /[enwfd]/.test(ch) &&

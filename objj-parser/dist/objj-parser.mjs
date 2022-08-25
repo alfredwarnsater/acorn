@@ -415,10 +415,10 @@ function getLineInfo(input, offset) {
 var defaultOptions = {
   // `ecmaVersion` indicates the ECMAScript version to parse. Must be
   // either 3, 5, 6 (or 2015), 7 (2016), 8 (2017), 9 (2018), 10
-  // (2019), 11 (2020), 12 (2021), 13 (2022), or `"latest"` (the
-  // latest version the library supports). This influences support
-  // for strict mode, the set of reserved words, and support for
-  // new syntax features.
+  // (2019), 11 (2020), 12 (2021), 13 (2022), 14 (2023), or `"latest"`
+  // (the latest version the library supports). This influences
+  // support for strict mode, the set of reserved words, and support
+  // for new syntax features.
   ecmaVersion: null,
   // `sourceType` indicates the mode the code should be parsed in.
   // Can be either `"script"` or `"module"`. This influences global
@@ -452,8 +452,9 @@ var defaultOptions = {
   // When enabled, super identifiers are not constrained to
   // appearing in methods and do not raise an error when they appear elsewhere.
   allowSuperOutsideMethod: null,
-  // When enabled, hashbang directive in the beginning of file
-  // is allowed and treated as a line comment.
+  // When enabled, hashbang directive in the beginning of file is
+  // allowed and treated as a line comment. Enabled by default when
+  // `ecmaVersion` >= 2023.
   allowHashBang: true,
   // When `locations` is on, `loc` properties holding objects with
   // `start` and `end` properties in `{line, column}` form (with
@@ -560,6 +561,9 @@ function getOptions(opts) {
 
   if (options.allowReserved == null)
     { options.allowReserved = options.ecmaVersion < 5; }
+
+  if (opts.allowHashBang == null)
+    { options.allowHashBang = options.ecmaVersion >= 14; }
 
   if (isArray(options.onToken)) {
     var tokens = options.onToken;
@@ -7615,7 +7619,7 @@ pp.readWord = function(preReadWord, onlyTransformMacroArguments) {
 
 // Acorn is a tiny, fast JavaScript parser written in JavaScript.
 
-var version = "8.7.1";
+var version = "8.8.0";
 
 Parser.acorn = {
   Parser: Parser,

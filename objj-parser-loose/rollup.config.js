@@ -8,13 +8,13 @@ export default {
       file: "objj-parser-loose/dist/objj-parser-loose.js",
       format: "umd",
       name: "objjParser.loose",
-      globals: {objjParser: "objj-parser"},
+      globals: {"objj-parser": "objj-parser"},
       sourcemap: true
     },
     {
       file: "objj-parser-loose/dist/objj-parser-loose.mjs",
       format: "es",
-      globals: {objjParser: "objj-parser"}
+      globals: {"objj-parser": "objj-parser"}
     }
   ],
   plugins: [

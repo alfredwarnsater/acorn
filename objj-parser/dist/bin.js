@@ -2,7 +2,7 @@
 
 var path = require('path');
 var fs = require('fs');
-var acorn = require('acorn');
+var acorn = require('objj-parser');
 
 function _interopNamespace(e) {
   if (e && e.__esModule) return e;
