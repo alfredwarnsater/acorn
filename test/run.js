@@ -31,7 +31,7 @@
   require("./tests-class-features-2022.js");
   require("./tests-module-string-names.js");
   require("./tests-preprocess.js");
-  var acorn = require("../acorn")
+  require("./tests-objj.js");
   var acorn_loose = require("../acorn-loose")
 
   var htmlLog = typeof document === "object" && document.getElementById('log');
