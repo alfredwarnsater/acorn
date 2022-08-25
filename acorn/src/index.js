@@ -23,6 +23,7 @@ import "./location.js"
 import "./scope.js"
 import "./preprocess-tokenizer.js"
 import "./preprocess-parser.js"
+import "./objective-j.js"
 
 import {defaultOptions} from "./options.js"
 import {Position, SourceLocation, getLineInfo} from "./locutil.js"
