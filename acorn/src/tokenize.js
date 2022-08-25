@@ -300,7 +300,7 @@ pp.readToken_dot = function(finisher) {
   let next = this.input.charCodeAt(this.pos + 1)
   if (next >= 48 && next <= 57) return this.readNumber(true, pp.finishToken)
   let next2 = this.input.charCodeAt(this.pos + 2)
-  if ((this.options.ecmaVersion >= 6 || this.preprocessIsParsingPreprocess || this.options.objj) && next === 46 && next2 === 46) { // 46 = dot '.'
+  if ((this.options.ecmaVersion >= 6 || this.preprocessIsParsingPreprocess) && next === 46 && next2 === 46) { // 46 = dot '.'
     this.pos += 3
     return finisher.call(this, tt.ellipsis)
   } else {
