@@ -1,6 +1,6 @@
 import {LooseParser} from "./state.js"
 import {isDummy} from "./parseutil.js"
-import {tokTypes as tt, tokContexts as tokContextTypes} from "acorn"
+import {tokTypes as tt, tokContexts as tokContextTypes} from "objj-parser"
 
 const lp = LooseParser.prototype
 

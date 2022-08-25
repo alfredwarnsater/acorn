@@ -1,17 +1,17 @@
 {
-  "name": "acorn-loose",
+  "name": "objj-parser-loose",
   "description": "Error-tolerant ECMAScript parser",
   "homepage": "https://github.com/acornjs/acorn",
-  "main": "dist/acorn-loose.js",
-  "module": "dist/acorn-loose.mjs",
+  "main": "dist/objj-parser-loose.js",
+  "module": "dist/objj-parser-loose.mjs",
   "exports": {
     ".": [
       {
-        "import": "./dist/acorn-loose.mjs",
-        "require": "./dist/acorn-loose.js",
-        "default": "./dist/acorn-loose.js"
+        "import": "./dist/objj-parser-loose.mjs",
+        "require": "./dist/objj-parser-loose.js",
+        "default": "./dist/objj-parser-loose.js"
       },
-      "./dist/acorn-loose.js"
+      "./dist/objj-parser-loose.js"
     ],
     "./package.json": "./package.json"
   },

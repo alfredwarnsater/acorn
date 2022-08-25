@@ -4,7 +4,7 @@
 if (typeof exports !== "undefined") {
   var driver = require("./driver.js");
   var test = driver.test, testFail = driver.testFail, testAssert = driver.testAssert;
-  var acorn = require("../acorn");
+  var acorn = require("../objj-parser");
 }
 
 test("import ''", {

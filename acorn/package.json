@@ -1,18 +1,16 @@
 {
-  "name": "acorn",
-  "description": "ECMAScript parser",
-  "homepage": "https://github.com/acornjs/acorn",
-  "main": "dist/acorn.js",
-  "types": "dist/acorn.d.ts",
-  "module": "dist/acorn.mjs",
+  "name": "objj-parser",
+  "main": "dist/objj-parser.js",
+  "types": "dist/objj-parser.d.ts",
+  "module": "dist/objj-parser.mjs",
   "exports": {
     ".": [
       {
-        "import": "./dist/acorn.mjs",
-        "require": "./dist/acorn.js",
-        "default": "./dist/acorn.js"
+        "import": "./dist/objj-parser.mjs",
+        "require": "./dist/objj-parser.js",
+        "default": "./dist/objj-parser.js"
       },
-      "./dist/acorn.js"
+      "./dist/objj-parser.js"
     ],
     "./package.json": "./package.json"
   },
@@ -45,6 +43,6 @@
     "prepare": "cd ..; npm run build:main"
   },
   "bin": {
-    "acorn": "./bin/acorn"
+    "acorn": "./bin/objj-parser"
   }
 }

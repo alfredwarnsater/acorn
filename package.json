@@ -22,8 +22,8 @@
   "license": "MIT",
   "scripts": {
     "build": "npm run build:main && npm run build:walk && npm run build:loose",
-    "build:loose": "rollup -c acorn-loose/rollup.config.js",
-    "build:main": "rollup -c acorn/rollup.config.js",
+    "build:loose": "rollup -c objj-parser-loose/rollup.config.js",
+    "build:main": "rollup -c objj-parser/rollup.config.js",
     "build:walk": "rollup -c acorn-walk/rollup.config.js",
     "generate": "node bin/generate-identifier-regex.js",
     "lint": "eslint .",

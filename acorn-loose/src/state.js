@@ -1,4 +1,4 @@
-import {Parser, SourceLocation, tokTypes as tt, Node, lineBreak, isNewLine} from "acorn"
+import {Parser, SourceLocation, tokTypes as tt, Node, lineBreak, isNewLine} from "objj-parser"
 import {dummyValue} from "./parseutil.js"
 
 function noop() {}

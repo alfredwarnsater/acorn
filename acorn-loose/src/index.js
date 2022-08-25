@@ -29,7 +29,7 @@
 // invasive changes and simplifications without creating a complicated
 // tangle.
 
-import {defaultOptions} from "acorn"
+import {defaultOptions} from "objj-parser"
 import {LooseParser} from "./state.js"
 import "./tokenize.js"
 import "./statement.js"
