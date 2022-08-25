@@ -62,7 +62,7 @@
       elem.innerHTML = "<b>" + title + "</b> " + message;
       htmlGroup.appendChild(elem);
     }
-    if (typeof console === "object") console.log(title, message);
+    if (typeof console === "object") console.log("%s %s", title, message);
   }
 
   var stats, modes = {
