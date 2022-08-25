@@ -155,7 +155,7 @@ export function getOptions(opts) {
     options.allowReserved = options.ecmaVersion < 5
 
   if (opts.allowHashBang == null)
-    options.allowHashBang = options.ecmaVersion >= 14
+    options.allowHashBang = options.allowHashBang || options.ecmaVersion >= 14
 
   if (isArray(options.onToken)) {
     let tokens = options.onToken
