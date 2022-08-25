@@ -46,7 +46,7 @@ export const defaultOptions = {
   allowSuperOutsideMethod: null,
   // When enabled, hashbang directive in the beginning of file
   // is allowed and treated as a line comment.
-  allowHashBang: false,
+  allowHashBang: true,
   // When `locations` is on, `loc` properties holding objects with
   // `start` and `end` properties in `{line, column}` form (with
   // line being 1-based and column 0-based) will be attached to the
@@ -94,7 +94,7 @@ export const defaultOptions = {
   // (non-standard) ParenthesizedExpression nodes
   preserveParens: false,
   // Turn on objj to allow Objective-J syntax
-  objj: false,
+  objj: true,
   // Turn on preprocess to allow C preprocess derectives.
   // #define macro1
   // #define macro2 console.log("Hello")
@@ -103,7 +103,7 @@ export const defaultOptions = {
   // #else
   // #endif
   // etc...
-  preprocess: false,
+  preprocess: true,
   // Preprocess 'get include file' function. It should return an object with two attributes
   // 'include': a string with the file to be included
   // 'sourceFile': is optional and should be a string with the filename. It will
