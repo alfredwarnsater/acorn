@@ -188,7 +188,7 @@ pp.parseObjjIvarDeclaration = function(node) {
   if (this.eat(oatt._outlet))
     outlet = true
   let type = this.parseObjectiveJType()
-  if (this.strict && this.isStrictBadIdWord(type.name))
+  if (this.strict && this.reservedWordsStrictBind.test(type.name))
     this.raise(type.start, "Binding " + type.name + " in strict mode")
   for (;;) {
     let decl = this.startNode()
@@ -196,7 +196,7 @@ pp.parseObjjIvarDeclaration = function(node) {
       decl.outlet = outlet
     decl.ivartype = type
     decl.id = this.parseIdent()
-    if (this.strict && this.isStrictBadIdWord(decl.id.name))
+    if (this.strict && this.reservedWordsStrictBind.test(decl.id.name))
       this.raise(decl.id.start, "Binding " + decl.id.name + " in strict mode")
     if (this.eat(oatt._accessors)) {
       decl.accessors = {}
