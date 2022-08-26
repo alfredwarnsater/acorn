@@ -5000,7 +5000,7 @@ pp$3.parseObjjClassElement = function() {
     var oldInFunc = this.objjInFunction, oldLabels = this.objjLabels, oldAsync = this.objjFunctionIsAsync;
     this.objjInFunction = true; this.objjLabels = [];
     this.objjFunctionIsAsync = !!element.returntype && !!element.returntype.async;
-    this.enterScope(functionFlags(this.objjFunctionIsAsync, false));
+    this.enterScope(functionFlags(this.objjFunctionIsAsync, false) | SCOPE_SUPER);
     element.body = this.parseBlock(true);
     this.exitScope();
     this.objjInFunction = oldInFunc; this.objjLabels = oldLabels; this.objjFunctionIsAsync = oldAsync;
